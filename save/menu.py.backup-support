@@ -1,0 +1,264 @@
+from aiogram import Router
+from aiogram.filters import Command
+from aiogram.types import CallbackQuery, Message
+from sqlalchemy import func, select
+
+from bot.keyboards.main import main_menu_keyboard
+from bot.keyboards.common import back_to_menu_keyboard
+from bot.keyboards.support import support_keyboard
+
+from database.database import AsyncSessionLocal
+from database.models import Cart, CartItem, Order, User
+
+
+router = Router()
+
+
+MAIN_MENU_TEXT = """
+🏠    MENU PRINCIPAL
+
+Bienvenue dans notre boutique ! 🛍️
+
+Que souhaitez-vous faire ?
+"""
+
+
+@router.callback_query(lambda callback: callback.data == "back_to_menu")
+async def back_to_menu_handler(callback: CallbackQuery):
+    await callback.answer()
+
+    if callback.message.photo:
+        await callback.message.edit_caption(
+            caption=MAIN_MENU_TEXT,
+            reply_markup=main_menu_keyboard(),
+        )
+    else:
+        await callback.message.edit_text(
+            MAIN_MENU_TEXT,
+            reply_markup=main_menu_keyboard(),
+        )
+
+
+@router.callback_query(lambda callback: callback.data == "menu_account")
+async def account_menu_handler(callback: CallbackQuery):
+    await callback.answer()
+
+    telegram_id = callback.from_user.id
+
+    async with AsyncSessionLocal() as session:
+        user = await session.scalar(
+            select(User).where(
+                User.telegram_id == telegram_id
+            )
+        )
+
+        if user is None:
+            error_text = (
+                "❌ <b>Compte introuvable</b>\n\n"
+                "Veuillez utiliser /start puis accepter les conditions."
+            )
+
+            if callback.message.photo:
+                await callback.message.edit_caption(
+                    caption=error_text,
+                    reply_markup=back_to_menu_keyboard(),
+                )
+            else:
+                await callback.message.edit_text(
+                    error_text,
+                    reply_markup=back_to_menu_keyboard(),
+                )
+            return
+
+        total_orders = await session.scalar(
+            select(func.count(Order.id)).where(
+                Order.user_id == user.id
+            )
+        ) or 0
+
+        active_orders = await session.scalar(
+            select(func.count(Order.id)).where(
+                Order.user_id == user.id,
+                Order.status.notin_(
+                    ("COMPLETED", "CANCELLED")
+                ),
+            )
+        ) or 0
+
+        completed_orders = await session.scalar(
+            select(func.count(Order.id)).where(
+                Order.user_id == user.id,
+                Order.status == "COMPLETED",
+            )
+        ) or 0
+
+        total_spent = await session.scalar(
+            select(
+                func.coalesce(
+                    func.sum(Order.total),
+                    0,
+                )
+            ).where(
+                Order.user_id == user.id,
+                Order.status == "COMPLETED",
+            )
+        ) or 0
+
+        cart = await session.scalar(
+            select(Cart).where(
+                Cart.user_id == user.id
+            )
+        )
+
+        cart_items = 0
+
+        if cart is not None:
+            cart_items = await session.scalar(
+                select(
+                    func.coalesce(
+                        func.sum(CartItem.quantity),
+                        0,
+                    )
+                ).where(
+                    CartItem.cart_id == cart.id
+                )
+            ) or 0
+
+    username = (
+        f"@{user.username}"
+        if user.username
+        else "Non renseigné"
+    )
+
+    full_name = " ".join(
+        part
+        for part in (
+            user.first_name,
+            user.last_name,
+        )
+        if part
+    ) or "Non renseigné"
+
+    accepted_text = (
+        "✅ Acceptées"
+        if user.accepted
+        else "❌ Non acceptées"
+    )
+
+    account_status = (
+        "🔴 Bloqué"
+        if user.is_blocked
+        else "🟢 Actif"
+    )
+
+    account_text = f"""
+👤    MON COMPTE
+
+👤 Informations personnelles
+
+Nom : {full_name}
+Username : {username}
+🆔 ID Telegram : {user.telegram_id}
+
+📅 Compte
+
+Date d'inscription : {user.created_at:%d/%m/%Y}
+Conditions : {accepted_text}
+Statut : {account_status}
+
+📦 Commandes
+
+Total :   {total_orders}
+En cours :   {active_orders}
+Terminées :   {completed_orders}
+
+💰 Achats
+
+Total dépensé : {total_spent:.2f} €
+
+🛒 Panier
+
+Articles actuellement dans le panier : {cart_items}
+"""
+
+    if callback.message.photo:
+        await callback.message.edit_caption(
+            caption=account_text,
+            reply_markup=back_to_menu_keyboard(),
+        )
+    else:
+        await callback.message.edit_text(
+            account_text,
+            reply_markup=back_to_menu_keyboard(),
+        )
+
+
+@router.callback_query(lambda callback: callback.data == "menu_support")
+async def support_menu_handler(callback: CallbackQuery):
+    await callback.answer()
+
+    support_text = """
+💬 <b>SUPPORT</b>
+
+Bienvenue dans le centre d'assistance de
+<b>Le Druide 06</b>.
+
+Comment pouvons-nous vous aider ?
+
+📦 Problème avec une commande
+🛍️ Question sur un produit
+💳 Question sur le paiement
+📝 Autre demande
+
+Notre équipe fera son possible pour vous répondre
+dans les meilleurs délais.
+"""
+
+    if callback.message.photo:
+        await callback.message.edit_caption(
+            caption=support_text,
+            reply_markup=support_keyboard(),
+        )
+    else:
+        await callback.message.edit_text(
+            support_text,
+            reply_markup=support_keyboard(),
+        )
+
+
+@router.callback_query(lambda callback: callback.data == "menu_information")
+async def information_menu_handler(callback: CallbackQuery):
+    await callback.answer()
+
+    information_text = """
+ℹ️ <b>INFORMATIONS</b>
+
+🛍️ Boutique
+💵 Paiement en liquide sur place
+📦 Retrait directement en boutique
+
+Merci de votre confiance !
+"""
+
+    if callback.message.photo:
+        await callback.message.edit_caption(
+            caption=information_text,
+            reply_markup=back_to_menu_keyboard(),
+        )
+    else:
+        await callback.message.edit_text(
+            information_text,
+            reply_markup=back_to_menu_keyboard(),
+        )
+
+
+@router.message(Command("boutique"))
+async def boutique_command_handler(message: Message):
+    await message.answer(
+        """
+🛍️ <b>BOUTIQUE</b>
+
+Utilisez le bouton ci-dessous pour accéder à la boutique.
+""",
+        reply_markup=main_menu_keyboard(),
+    )

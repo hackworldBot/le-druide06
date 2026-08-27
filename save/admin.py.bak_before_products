@@ -1,0 +1,118 @@
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+
+
+def admin_orders_keyboard(orders):
+    buttons = []
+
+    status_labels = {
+        "PENDING": "🟡",
+        "PREPARING": "🔵",
+        "READY": "🟢",
+        "COMPLETED": "✅",
+        "CANCELLED": "🔴",
+    }
+
+    for order in orders:
+        icon = status_labels.get(
+            order.status,
+            "📦",
+        )
+
+        buttons.append([
+            InlineKeyboardButton(
+                text=(
+                    f"{icon} #{order.id} — "
+                    f"{order.total:.2f} € — "
+                    f"{order.status}"
+                ),
+                callback_data=f"admin_order:{order.id}",
+            )
+        ])
+
+    buttons.append([
+        InlineKeyboardButton(
+            text="🔄 Actualiser",
+            callback_data="admin_orders",
+        )
+    ])
+
+    buttons.append([
+        InlineKeyboardButton(
+            text="🏠 Menu principal",
+            callback_data="back_to_menu",
+        )
+    ])
+
+    return InlineKeyboardMarkup(
+        inline_keyboard=buttons
+    )
+
+
+def admin_order_detail_keyboard(order):
+    buttons = []
+
+    if order.status == "PENDING":
+        buttons.append([
+            InlineKeyboardButton(
+                text="🔵 PRÉPARER",
+                callback_data=(
+                    f"admin_status:{order.id}:PREPARING"
+                ),
+            )
+        ])
+
+        buttons.append([
+            InlineKeyboardButton(
+                text="❌ ANNULER",
+                callback_data=(
+                    f"admin_status:{order.id}:CANCELLED"
+                ),
+            )
+        ])
+
+    elif order.status == "PREPARING":
+        buttons.append([
+            InlineKeyboardButton(
+                text="🟢 MARQUER PRÊTE",
+                callback_data=(
+                    f"admin_status:{order.id}:READY"
+                ),
+            )
+        ])
+
+        buttons.append([
+            InlineKeyboardButton(
+                text="❌ ANNULER",
+                callback_data=(
+                    f"admin_status:{order.id}:CANCELLED"
+                ),
+            )
+        ])
+
+    elif order.status == "READY":
+        buttons.append([
+            InlineKeyboardButton(
+                text="✅ TERMINER LA COMMANDE",
+                callback_data=(
+                    f"admin_status:{order.id}:COMPLETED"
+                ),
+            )
+        ])
+
+    buttons.append([
+        InlineKeyboardButton(
+            text="⬅️ Commandes",
+            callback_data="admin_orders",
+        )
+    ])
+
+    buttons.append([
+        InlineKeyboardButton(
+            text="🏠 Menu principal",
+            callback_data="back_to_menu",
+        )
+    ])
+
+    return InlineKeyboardMarkup(
+        inline_keyboard=buttons
+    )

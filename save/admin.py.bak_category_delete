@@ -1,0 +1,1917 @@
+from aiogram import Router
+from aiogram.filters import Command
+from aiogram.types import (
+    CallbackQuery,
+    Message,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+)
+from aiogram.fsm.context import FSMContext
+from sqlalchemy import select
+
+from database.database import AsyncSessionLocal
+from database.models import Order, OrderItem, User, Product, Category
+
+from bot.states.admin import ProductStates, CategoryStates
+
+from bot.keyboards.admin_products import (
+    admin_products_keyboard,
+    admin_product_list_keyboard,
+    admin_product_detail_keyboard,
+)
+
+from bot.keyboards.admin import (
+    admin_main_keyboard,
+    admin_orders_keyboard,
+    admin_order_detail_keyboard,
+    admin_category_list_keyboard,
+    admin_category_detail_keyboard,
+)
+
+
+router = Router()
+
+ADMIN_TELEGRAM_ID = 8727592009
+
+
+def is_admin(telegram_id: int) -> bool:
+    return telegram_id == ADMIN_TELEGRAM_ID
+
+
+async def get_orders():
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(
+            select(Order)
+            .order_by(Order.created_at.desc())
+        )
+
+        return result.scalars().all()
+
+
+def status_label(status: str) -> str:
+    labels = {
+        "PENDING": "🟡 EN ATTENTE",
+        "PREPARING": "🔵 EN PRÉPARATION",
+        "READY": "🟢 PRÊTE",
+        "COMPLETED": "✅ TERMINÉE",
+        "CANCELLED": "🔴 ANNULÉE",
+    }
+
+    return labels.get(status, status)
+
+
+async def show_admin_orders(target):
+    orders = await get_orders()
+
+    if not orders:
+        text = """
+👨‍💼 <b>ADMINISTRATION</b>
+
+📦 Aucune commande.
+"""
+    else:
+        pending = sum(
+            1 for order in orders
+            if order.status == "PENDING"
+        )
+
+        preparing = sum(
+            1 for order in orders
+            if order.status == "PREPARING"
+        )
+
+        ready = sum(
+            1 for order in orders
+            if order.status == "READY"
+        )
+
+        completed = sum(
+            1 for order in orders
+            if order.status == "COMPLETED"
+        )
+
+        cancelled = sum(
+            1 for order in orders
+            if order.status == "CANCELLED"
+        )
+
+        text = f"""
+👨‍💼 <b>ADMINISTRATION</b>
+
+📦 Commandes : <b>{len(orders)}</b>
+
+🟡 En attente : <b>{pending}</b>
+🔵 En préparation : <b>{preparing}</b>
+🟢 Prêtes : <b>{ready}</b>
+✅ Terminées : <b>{completed}</b>
+🔴 Annulées : <b>{cancelled}</b>
+
+Sélectionne une commande :
+"""
+
+    keyboard = admin_orders_keyboard(orders)
+
+    if isinstance(target, Message):
+        await target.answer(
+            text,
+            reply_markup=keyboard,
+        )
+    else:
+        await target.message.edit_text(
+            text,
+            reply_markup=keyboard,
+        )
+
+
+@router.message(Command("admin"))
+async def admin_command(message: Message):
+    if not is_admin(message.from_user.id):
+        await message.answer(
+            "⛔ Accès administrateur refusé."
+        )
+        return
+
+    await show_admin_home(message)
+
+
+async def show_admin_home(target):
+    text = """
+👨‍💼 <b>ADMINISTRATION</b>
+
+Bienvenue dans le panneau d'administration.
+
+Choisissez une section :
+"""
+
+    keyboard = admin_main_keyboard()
+
+    if isinstance(target, Message):
+        await target.answer(
+            text,
+            reply_markup=keyboard,
+        )
+    else:
+        await target.message.edit_text(
+            text,
+            reply_markup=keyboard,
+        )
+
+
+@router.callback_query(
+    lambda callback: callback.data == "admin_home"
+)
+async def admin_home_callback(callback: CallbackQuery):
+    if not is_admin(callback.from_user.id):
+        await callback.answer(
+            "⛔ Accès refusé.",
+            show_alert=True,
+        )
+        return
+
+    await callback.answer()
+    await show_admin_home(callback)
+
+
+async def show_admin_products(target):
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(
+            select(Product)
+            .order_by(Product.name)
+        )
+
+        products = result.scalars().all()
+
+    text = """
+📦 <b>GESTION DES PRODUITS</b>
+
+Choisissez une action :
+"""
+
+    keyboard = admin_products_keyboard()
+
+    if isinstance(target, Message):
+        await target.answer(
+            text,
+            reply_markup=keyboard,
+        )
+    else:
+        await target.message.edit_text(
+            text,
+            reply_markup=keyboard,
+        )
+
+
+@router.callback_query(
+    lambda callback: callback.data == "admin_products"
+)
+async def admin_products_callback(callback: CallbackQuery):
+    if not is_admin(callback.from_user.id):
+        await callback.answer(
+            "⛔ Accès refusé.",
+            show_alert=True,
+        )
+        return
+
+    await callback.answer()
+    await show_admin_products(callback)
+
+
+@router.callback_query(
+    lambda callback: callback.data == "admin_product_add"
+)
+async def admin_product_add_callback(
+    callback: CallbackQuery,
+    state: FSMContext,
+):
+    if not is_admin(callback.from_user.id):
+        await callback.answer(
+            "⛔ Accès refusé.",
+            show_alert=True,
+        )
+        return
+
+    await state.clear()
+    await state.set_state(ProductStates.waiting_name)
+
+    await callback.answer()
+
+    await callback.message.edit_text(
+        """
+➕ <b>AJOUT D'UN PRODUIT</b>
+
+Entrez le <b>nom</b> du produit :
+"""
+    )
+
+
+@router.callback_query(
+    lambda callback: callback.data == "admin_product_list"
+)
+async def admin_product_list_callback(callback: CallbackQuery):
+    if not is_admin(callback.from_user.id):
+        await callback.answer(
+            "⛔ Accès refusé.",
+            show_alert=True,
+        )
+        return
+
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(
+            select(Product)
+            .order_by(Product.name)
+        )
+
+        products = result.scalars().all()
+
+    if not products:
+        text = """
+📋 <b>LISTE DES PRODUITS</b>
+
+Aucun produit dans la base.
+"""
+    else:
+        text = """
+📋 <b>LISTE DES PRODUITS</b>
+
+Sélectionnez un produit :
+"""
+
+    await callback.answer()
+
+    await callback.message.edit_text(
+        text,
+        reply_markup=admin_product_list_keyboard(products),
+    )
+
+
+@router.callback_query(
+    lambda callback: callback.data.startswith("admin_product:")
+)
+async def admin_product_detail_callback(callback: CallbackQuery):
+    if not is_admin(callback.from_user.id):
+        await callback.answer(
+            "⛔ Accès refusé.",
+            show_alert=True,
+        )
+        return
+
+    product_id = int(callback.data.split(":")[1])
+
+    async with AsyncSessionLocal() as session:
+        product = await session.scalar(
+            select(Product).where(
+                Product.id == product_id
+            )
+        )
+
+        if product is None:
+            await callback.answer(
+                "Produit introuvable.",
+                show_alert=True,
+            )
+            return
+
+        category = await session.scalar(
+            select(Category).where(
+                Category.id == product.category_id
+            )
+        )
+
+    status = "🟢 ACTIF" if product.is_active else "🔴 INACTIF"
+
+    category_name = (
+        category.name
+        if category is not None
+        else "Inconnue"
+    )
+
+    text = f"""
+📦 <b>PRODUIT #{product.id}</b>
+
+<b>{product.name}</b>
+
+📝 Description :
+{product.description or "Aucune description"}
+
+💰 Prix : <b>{product.price:.2f} €</b>
+📊 Stock : <b>{product.stock}</b>
+📂 Catégorie : <b>{category_name}</b>
+📌 Statut : <b>{status}</b>
+"""
+
+    await callback.answer()
+
+    await callback.message.edit_text(
+        text,
+        reply_markup=admin_product_detail_keyboard(product),
+    )
+
+
+@router.callback_query(
+    lambda callback: callback.data == "admin_categories"
+)
+async def admin_categories_callback(
+    callback: CallbackQuery,
+):
+    if not is_admin(callback.from_user.id):
+        await callback.answer(
+            "⛔ Accès refusé.",
+            show_alert=True,
+        )
+        return
+
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(
+            select(Category)
+            .order_by(Category.sort_order, Category.name)
+        )
+        categories = result.scalars().all()
+
+    if not categories:
+        text = """
+📂 <b>GESTION DES CATÉGORIES</b>
+
+Aucune catégorie dans la base de données.
+"""
+    else:
+        lines = [
+            "📂 <b>GESTION DES CATÉGORIES</b>",
+            "",
+            "Sélectionnez une catégorie :",
+        ]
+
+        text = "\n".join(lines)
+
+    await callback.answer()
+
+    await callback.message.edit_text(
+        text,
+        reply_markup=admin_category_list_keyboard(categories),
+    )
+
+
+@router.callback_query(
+    lambda callback: callback.data == "admin_category_add"
+)
+async def admin_category_add_callback(
+    callback: CallbackQuery,
+    state: FSMContext,
+):
+    if not is_admin(callback.from_user.id):
+        await callback.answer(
+            "⛔ Accès refusé.",
+            show_alert=True,
+        )
+        return
+
+    await state.clear()
+    await state.set_state(CategoryStates.waiting_name)
+
+    await callback.answer()
+
+    await callback.message.edit_text(
+        """
+➕ <b>AJOUT D'UNE CATÉGORIE</b>
+
+Entrez le <b>nom</b> de la catégorie :
+
+Exemple :
+<code>Boissons</code>
+"""
+    )
+
+
+@router.message(CategoryStates.waiting_name)
+async def category_waiting_name(
+    message: Message,
+    state: FSMContext,
+):
+    if not is_admin(message.from_user.id):
+        return
+
+    value = (message.text or "").strip()
+
+    if not value:
+        await message.answer(
+            "❌ Le nom ne peut pas être vide."
+        )
+        return
+
+    if len(value) > 255:
+        await message.answer(
+            "❌ Nom trop long (255 caractères maximum)."
+        )
+        return
+
+    async with AsyncSessionLocal() as session:
+        existing = await session.scalar(
+            select(Category).where(
+                Category.name == value
+            )
+        )
+
+    if existing is not None:
+        await message.answer(
+            "❌ Une catégorie portant ce nom existe déjà."
+        )
+        return
+
+    await state.update_data(name=value)
+    await state.set_state(CategoryStates.waiting_description)
+
+    await message.answer(
+        """
+📝 <b>DESCRIPTION</b>
+
+Entrez la description de la catégorie.
+
+<i>Pour ne pas mettre de description :</i>
+<code>-</code>
+"""
+    )
+
+
+@router.message(CategoryStates.waiting_description)
+async def category_waiting_description(
+    message: Message,
+    state: FSMContext,
+):
+    if not is_admin(message.from_user.id):
+        return
+
+    value = (message.text or "").strip()
+
+    if value == "-":
+        value = None
+    elif len(value) > 1000:
+        await message.answer(
+            "❌ Description trop longue (1000 caractères maximum)."
+        )
+        return
+
+    await state.update_data(description=value)
+    await state.set_state(CategoryStates.waiting_sort_order)
+
+    await message.answer(
+        """
+🔢 <b>ORDRE D'AFFICHAGE</b>
+
+Entrez le numéro d'ordre.
+
+Exemple :
+<code>1</code>
+
+Vous pouvez utiliser <code>0</code> pour l'ordre par défaut.
+"""
+    )
+
+
+@router.message(CategoryStates.waiting_sort_order)
+async def category_waiting_sort_order(
+    message: Message,
+    state: FSMContext,
+):
+    if not is_admin(message.from_user.id):
+        return
+
+    value = (message.text or "").strip()
+
+    try:
+        sort_order = int(value)
+    except ValueError:
+        await message.answer(
+            "❌ Ordre invalide. Entrez un nombre entier."
+        )
+        return
+
+    if sort_order < 0:
+        await message.answer(
+            "❌ L'ordre ne peut pas être négatif."
+        )
+        return
+
+    data = await state.get_data()
+
+    async with AsyncSessionLocal() as session:
+        existing = await session.scalar(
+            select(Category).where(
+                Category.name == data["name"]
+            )
+        )
+
+        if existing is not None:
+            await state.clear()
+            await message.answer(
+                "❌ Cette catégorie existe déjà."
+            )
+            return
+
+        category = Category(
+            name=data["name"],
+            description=data.get("description"),
+            sort_order=sort_order,
+            is_active=True,
+        )
+
+        session.add(category)
+        await session.commit()
+        await session.refresh(category)
+
+    await state.clear()
+
+    await message.answer(
+        f"""
+✅ <b>CATÉGORIE CRÉÉE</b>
+
+📂 <b>{category.name}</b>
+
+📝 Description :
+{category.description or "Aucune description"}
+
+🔢 Ordre : <b>{category.sort_order}</b>
+
+📌 Statut : 🟢 ACTIF
+
+🆔 ID : <b>#{category.id}</b>
+""",
+        reply_markup=InlineKeyboardMarkup(
+            inline_keyboard=[
+                [
+                    InlineKeyboardButton(
+                        text="📂 Voir les catégories",
+                        callback_data="admin_categories",
+                    )
+                ],
+                [
+                    InlineKeyboardButton(
+                        text="⬅️ Administration",
+                        callback_data="admin_home",
+                    )
+                ],
+            ]
+        ),
+    )
+
+
+@router.callback_query(
+    lambda callback: callback.data == "admin_orders"
+)
+async def admin_orders_callback(callback: CallbackQuery):
+    if not is_admin(callback.from_user.id):
+        await callback.answer(
+            "⛔ Accès refusé.",
+            show_alert=True,
+        )
+        return
+
+    await callback.answer()
+    await show_admin_orders(callback)
+
+
+@router.callback_query(
+    lambda callback: callback.data.startswith("admin_order:")
+)
+async def admin_order_detail(callback: CallbackQuery):
+    if not is_admin(callback.from_user.id):
+        await callback.answer(
+            "⛔ Accès refusé.",
+            show_alert=True,
+        )
+        return
+
+    order_id = int(callback.data.split(":")[1])
+
+    async with AsyncSessionLocal() as session:
+        order = await session.scalar(
+            select(Order).where(
+                Order.id == order_id
+            )
+        )
+
+        if order is None:
+            await callback.answer(
+                "Commande introuvable.",
+                show_alert=True,
+            )
+            return
+
+        result = await session.execute(
+            select(OrderItem)
+            .where(OrderItem.order_id == order.id)
+            .order_by(OrderItem.id)
+        )
+
+        items = result.scalars().all()
+
+    lines = [
+        f"👨‍💼 <b>COMMANDE #{order.id}</b>",
+        "",
+        f"📅 {order.created_at:%d/%m/%Y %H:%M}",
+        f"📌 Statut : <b>{status_label(order.status)}</b>",
+        f"💰 Total : <b>{order.total:.2f} €</b>",
+        f"💵 Paiement : <b>{order.payment_method}</b>",
+        "",
+        "📦 <b>ARTICLES</b>",
+        "",
+    ]
+
+    for item in items:
+        lines.append(
+            f"• {item.product_name} "
+            f"x{item.quantity} "
+            f"= <b>{item.subtotal:.2f} €</b>"
+        )
+
+    await callback.answer()
+
+    await callback.message.edit_text(
+        "\n".join(lines),
+        reply_markup=admin_order_detail_keyboard(order),
+    )
+
+
+@router.callback_query(
+    lambda callback: callback.data.startswith("admin_status:")
+)
+async def admin_change_status(callback: CallbackQuery):
+    if not is_admin(callback.from_user.id):
+        await callback.answer(
+            "⛔ Accès refusé.",
+            show_alert=True,
+        )
+        return
+
+    parts = callback.data.split(":")
+
+    if len(parts) != 3:
+        await callback.answer(
+            "Action invalide.",
+            show_alert=True,
+        )
+        return
+
+    order_id = int(parts[1])
+    new_status = parts[2]
+
+    allowed = {
+        "PENDING": {
+            "PREPARING",
+            "CANCELLED",
+        },
+        "PREPARING": {
+            "READY",
+            "CANCELLED",
+        },
+        "READY": {
+            "COMPLETED",
+        },
+    }
+
+    async with AsyncSessionLocal() as session:
+        order = await session.scalar(
+            select(Order).where(
+                Order.id == order_id
+            )
+        )
+
+        if order is None:
+            await callback.answer(
+                "Commande introuvable.",
+                show_alert=True,
+            )
+            return
+
+        current_status = order.status
+
+        if new_status not in allowed.get(
+            current_status,
+            set(),
+        ):
+            await callback.answer(
+                f"Transition impossible : "
+                f"{current_status} → {new_status}",
+                show_alert=True,
+            )
+            return
+
+        # ==========================================
+        # ANNULATION
+        # ==========================================
+        # Le stock avait été retiré lors de la
+        # validation de la commande.
+        #
+        # On le remet donc uniquement lors du passage
+        # vers CANCELLED.
+        # ==========================================
+
+        if new_status == "CANCELLED":
+
+            result = await session.execute(
+                select(OrderItem)
+                .where(
+                    OrderItem.order_id == order.id
+                )
+            )
+
+            items = result.scalars().all()
+
+            for item in items:
+
+                product = await session.scalar(
+                    select(Product)
+                    .where(
+                        Product.id == item.product_id
+                    )
+                    .with_for_update()
+                )
+
+                if product is not None:
+                    product.stock += item.quantity
+
+        order.status = new_status
+
+        await session.commit()
+
+    if new_status == "CANCELLED":
+        await callback.answer(
+            f"🔴 Commande #{order_id} annulée. "
+            f"Stock restauré."
+        )
+    else:
+        await callback.answer(
+            f"✅ Commande #{order_id} : "
+            f"{status_label(new_status)}"
+        )
+
+    await admin_order_detail(callback)
+
+
+# ============================================================
+# AJOUT PRODUIT — FORMULAIRE FSM
+# ============================================================
+
+@router.message(ProductStates.waiting_name)
+async def product_waiting_name(
+    message: Message,
+    state: FSMContext,
+):
+    if not is_admin(message.from_user.id):
+        return
+
+    name = message.text.strip()
+
+    if not name:
+        await message.answer(
+            "❌ Le nom ne peut pas être vide.\n\n"
+            "Entrez le nom du produit :"
+        )
+        return
+
+    if len(name) > 255:
+        await message.answer(
+            "❌ Le nom est trop long (255 caractères maximum).\n\n"
+            "Entrez un autre nom :"
+        )
+        return
+
+    await state.update_data(name=name)
+    await state.set_state(ProductStates.waiting_description)
+
+    await message.answer(
+        "📝 <b>DESCRIPTION</b>\n\n"
+        "Entrez la description du produit.\n\n"
+        "Si vous ne voulez pas de description, envoyez :\n"
+        "<code>-</code>"
+    )
+
+
+@router.message(ProductStates.waiting_description)
+async def product_waiting_description(
+    message: Message,
+    state: FSMContext,
+):
+    if not is_admin(message.from_user.id):
+        return
+
+    description = message.text.strip()
+
+    if description == "-":
+        description = None
+
+    if description is not None and len(description) > 5000:
+        await message.answer(
+            "❌ Description trop longue.\n\n"
+            "Entrez une description plus courte :"
+        )
+        return
+
+    await state.update_data(description=description)
+    await state.set_state(ProductStates.waiting_price)
+
+    await message.answer(
+        "💰 <b>PRIX</b>\n\n"
+        "Entrez le prix en euros.\n\n"
+        "Exemple : <code>12.50</code>"
+    )
+
+
+@router.message(ProductStates.waiting_price)
+async def product_waiting_price(
+    message: Message,
+    state: FSMContext,
+):
+    if not is_admin(message.from_user.id):
+        return
+
+    from decimal import Decimal, InvalidOperation
+
+    value = message.text.strip().replace(",", ".")
+
+    try:
+        price = Decimal(value)
+    except InvalidOperation:
+        await message.answer(
+            "❌ Prix invalide.\n\n"
+            "Entrez uniquement un nombre.\n"
+            "Exemple : <code>12.50</code>"
+        )
+        return
+
+    if price < 0:
+        await message.answer(
+            "❌ Le prix ne peut pas être négatif."
+        )
+        return
+
+    if price > Decimal("99999999.99"):
+        await message.answer(
+            "❌ Prix trop élevé."
+        )
+        return
+
+    await state.update_data(price=str(price))
+    await state.set_state(ProductStates.waiting_stock)
+
+    await message.answer(
+        "📊 <b>STOCK</b>\n\n"
+        "Entrez la quantité disponible.\n\n"
+        "Exemple : <code>10</code>"
+    )
+
+
+@router.message(ProductStates.waiting_stock)
+async def product_waiting_stock(
+    message: Message,
+    state: FSMContext,
+):
+    if not is_admin(message.from_user.id):
+        return
+
+    value = message.text.strip()
+
+    try:
+        stock = int(value)
+    except ValueError:
+        await message.answer(
+            "❌ Stock invalide.\n\n"
+            "Entrez un nombre entier.\n"
+            "Exemple : <code>10</code>"
+        )
+        return
+
+    if stock < 0:
+        await message.answer(
+            "❌ Le stock ne peut pas être négatif."
+        )
+        return
+
+    await state.update_data(stock=stock)
+    await state.set_state(ProductStates.waiting_category)
+
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(
+            select(Category)
+            .where(Category.is_active == True)
+            .order_by(Category.sort_order, Category.name)
+        )
+
+        categories = result.scalars().all()
+
+    if not categories:
+        await state.clear()
+
+        await message.answer(
+            "❌ Impossible de créer le produit.\n\n"
+            "Aucune catégorie active n'existe."
+        )
+        return
+
+    from bot.keyboards.admin_products import product_categories_keyboard
+
+    await message.answer(
+        "📂 <b>CATÉGORIE</b>\n\n"
+        "Choisissez la catégorie du produit :",
+        reply_markup=product_categories_keyboard(categories),
+    )
+
+
+@router.callback_query(
+    lambda callback: callback.data.startswith("admin_product_category:")
+)
+async def product_select_category(
+    callback: CallbackQuery,
+    state: FSMContext,
+):
+    if not is_admin(callback.from_user.id):
+        await callback.answer(
+            "⛔ Accès refusé.",
+            show_alert=True,
+        )
+        return
+
+    if await state.get_state() != ProductStates.waiting_category.state:
+        await callback.answer(
+            "Cette opération n'est plus active.",
+            show_alert=True,
+        )
+        return
+
+    category_id = int(callback.data.split(":")[1])
+
+    async with AsyncSessionLocal() as session:
+        category = await session.scalar(
+            select(Category).where(
+                Category.id == category_id,
+                Category.is_active == True,
+            )
+        )
+
+        if category is None:
+            await callback.answer(
+                "Catégorie introuvable.",
+                show_alert=True,
+            )
+            return
+
+        data = await state.get_data()
+
+        from decimal import Decimal
+
+        product = Product(
+            category_id=category.id,
+            name=data["name"],
+            description=data.get("description"),
+            price=Decimal(data["price"]),
+            stock=data["stock"],
+            is_active=True,
+        )
+
+        session.add(product)
+        await session.commit()
+        await session.refresh(product)
+
+    await state.clear()
+
+    await callback.answer("✅ Produit créé !")
+
+    await callback.message.edit_text(
+        f"""
+✅ <b>PRODUIT CRÉÉ</b>
+
+📦 <b>{product.name}</b>
+
+📝 Description :
+{product.description or "Aucune description"}
+
+💰 Prix : <b>{product.price:.2f} €</b>
+📊 Stock : <b>{product.stock}</b>
+📂 Catégorie : <b>{category.name}</b>
+📌 Statut : 🟢 ACTIF
+
+🆔 ID : <b>#{product.id}</b>
+"""
+    )
+
+
+# ============================================================
+# MODIFICATION PRODUIT
+# ============================================================
+
+@router.callback_query(
+    lambda callback: callback.data.startswith("admin_product_edit:")
+)
+async def admin_product_edit_callback(
+    callback: CallbackQuery,
+    state: FSMContext,
+):
+    if not is_admin(callback.from_user.id):
+        await callback.answer(
+            "⛔ Accès refusé.",
+            show_alert=True,
+        )
+        return
+
+    product_id = int(callback.data.split(":")[1])
+
+    async with AsyncSessionLocal() as session:
+        product = await session.scalar(
+            select(Product).where(Product.id == product_id)
+        )
+
+    if product is None:
+        await callback.answer(
+            "Produit introuvable.",
+            show_alert=True,
+        )
+        return
+
+    await state.clear()
+    await state.update_data(product_id=product.id)
+    await state.set_state(ProductStates.editing_name)
+
+    await callback.answer()
+
+    await callback.message.edit_text(
+        f"""
+✏️ <b>MODIFICATION DU PRODUIT #{product.id}</b>
+
+Nom actuel :
+<b>{product.name}</b>
+
+Entrez le nouveau nom :
+
+<i>Pour conserver le nom actuel, envoyez :</i>
+<code>-</code>
+"""
+    )
+
+
+@router.message(ProductStates.editing_name)
+async def product_editing_name(
+    message: Message,
+    state: FSMContext,
+):
+    if not is_admin(message.from_user.id):
+        return
+
+    value = message.text.strip()
+    data = await state.get_data()
+
+    async with AsyncSessionLocal() as session:
+        product = await session.scalar(
+            select(Product).where(
+                Product.id == data["product_id"]
+            )
+        )
+
+        if product is None:
+            await state.clear()
+            await message.answer("❌ Produit introuvable.")
+            return
+
+        if value != "-":
+            if not value:
+                await message.answer(
+                    "❌ Le nom ne peut pas être vide."
+                )
+                return
+
+            if len(value) > 255:
+                await message.answer(
+                    "❌ Nom trop long (255 caractères maximum)."
+                )
+                return
+
+            product.name = value
+
+        await session.commit()
+
+    await state.set_state(ProductStates.editing_description)
+
+    await message.answer(
+        f"""
+📝 <b>DESCRIPTION</b>
+
+Description actuelle :
+{product.description or "Aucune description"}
+
+Entrez la nouvelle description.
+
+<i>Pour conserver la description actuelle :</i>
+<code>-</code>
+
+<i>Pour supprimer la description :</i>
+<code>vide</code>
+"""
+    )
+
+
+@router.message(ProductStates.editing_description)
+async def product_editing_description(
+    message: Message,
+    state: FSMContext,
+):
+    if not is_admin(message.from_user.id):
+        return
+
+    value = message.text.strip()
+    data = await state.get_data()
+
+    async with AsyncSessionLocal() as session:
+        product = await session.scalar(
+            select(Product).where(
+                Product.id == data["product_id"]
+            )
+        )
+
+        if product is None:
+            await state.clear()
+            await message.answer("❌ Produit introuvable.")
+            return
+
+        if value == "-":
+            pass
+        elif value.lower() == "vide":
+            product.description = None
+        else:
+            if len(value) > 5000:
+                await message.answer(
+                    "❌ Description trop longue."
+                )
+                return
+
+            product.description = value
+
+        await session.commit()
+
+    await state.set_state(ProductStates.editing_price)
+
+    await message.answer(
+        f"""
+💰 <b>PRIX</b>
+
+Prix actuel :
+<b>{product.price:.2f} €</b>
+
+Entrez le nouveau prix.
+
+<i>Pour conserver le prix actuel :</i>
+<code>-</code>
+
+Exemple :
+<code>12.50</code>
+"""
+    )
+
+
+@router.message(ProductStates.editing_price)
+async def product_editing_price(
+    message: Message,
+    state: FSMContext,
+):
+    if not is_admin(message.from_user.id):
+        return
+
+    from decimal import Decimal, InvalidOperation
+
+    value = message.text.strip()
+    data = await state.get_data()
+
+    if value != "-":
+        value = value.replace(",", ".")
+
+        try:
+            price = Decimal(value)
+        except InvalidOperation:
+            await message.answer(
+                "❌ Prix invalide.\n\n"
+                "Exemple : <code>12.50</code>"
+            )
+            return
+
+        if price < 0:
+            await message.answer(
+                "❌ Le prix ne peut pas être négatif."
+            )
+            return
+
+        if price > Decimal("99999999.99"):
+            await message.answer(
+                "❌ Prix trop élevé."
+            )
+            return
+    else:
+        price = None
+
+    async with AsyncSessionLocal() as session:
+        product = await session.scalar(
+            select(Product).where(
+                Product.id == data["product_id"]
+            )
+        )
+
+        if product is None:
+            await state.clear()
+            await message.answer("❌ Produit introuvable.")
+            return
+
+        if price is not None:
+            product.price = price
+
+        await session.commit()
+
+    await state.set_state(ProductStates.editing_stock)
+
+    await message.answer(
+        f"""
+📊 <b>STOCK</b>
+
+Stock actuel :
+<b>{product.stock}</b>
+
+Entrez le nouveau stock.
+
+<i>Pour conserver le stock actuel :</i>
+<code>-</code>
+
+Exemple :
+<code>20</code>
+"""
+    )
+
+
+@router.message(ProductStates.editing_stock)
+async def product_editing_stock(
+    message: Message,
+    state: FSMContext,
+):
+    if not is_admin(message.from_user.id):
+        return
+
+    value = message.text.strip()
+    data = await state.get_data()
+
+    if value != "-":
+        try:
+            stock = int(value)
+        except ValueError:
+            await message.answer(
+                "❌ Stock invalide.\n\n"
+                "Entrez un nombre entier."
+            )
+            return
+
+        if stock < 0:
+            await message.answer(
+                "❌ Le stock ne peut pas être négatif."
+            )
+            return
+    else:
+        stock = None
+
+    async with AsyncSessionLocal() as session:
+        product = await session.scalar(
+            select(Product).where(
+                Product.id == data["product_id"]
+            )
+        )
+
+        if product is None:
+            await state.clear()
+            await message.answer("❌ Produit introuvable.")
+            return
+
+        if stock is not None:
+            product.stock = stock
+
+        await session.commit()
+        await session.refresh(product)
+
+        category = await session.scalar(
+            select(Category).where(
+                Category.id == product.category_id
+            )
+        )
+
+    await state.clear()
+
+    category_name = (
+        category.name
+        if category is not None
+        else "Inconnue"
+    )
+
+    await message.answer(
+        f"""
+✅ <b>PRODUIT MODIFIÉ</b>
+
+📦 <b>{product.name}</b>
+
+📝 Description :
+{product.description or "Aucune description"}
+
+💰 Prix : <b>{product.price:.2f} €</b>
+📊 Stock : <b>{product.stock}</b>
+📂 Catégorie : <b>{category_name}</b>
+📌 Statut :
+{"🟢 ACTIF" if product.is_active else "🔴 INACTIF"}
+
+🆔 ID : <b>#{product.id}</b>
+""",
+        reply_markup=admin_product_detail_keyboard(product),
+    )
+
+
+# ============================================================
+# MODIFICATION RAPIDE DU PRIX
+# ============================================================
+
+@router.callback_query(
+    lambda callback: callback.data.startswith("admin_product_price:")
+)
+async def admin_product_price_callback(
+    callback: CallbackQuery,
+    state: FSMContext,
+):
+    if not is_admin(callback.from_user.id):
+        await callback.answer(
+            "⛔ Accès refusé.",
+            show_alert=True,
+        )
+        return
+
+    product_id = int(callback.data.split(":")[1])
+
+    async with AsyncSessionLocal() as session:
+        product = await session.scalar(
+            select(Product).where(Product.id == product_id)
+        )
+
+    if product is None:
+        await callback.answer(
+            "Produit introuvable.",
+            show_alert=True,
+        )
+        return
+
+    await state.clear()
+    await state.update_data(product_id=product.id)
+    await state.set_state(ProductStates.editing_price)
+
+    await callback.answer()
+
+    await callback.message.edit_text(
+        f"""
+💰 <b>MODIFIER LE PRIX</b>
+
+Produit :
+<b>{product.name}</b>
+
+Prix actuel :
+<b>{product.price:.2f} €</b>
+
+Entrez le nouveau prix :
+
+Exemple :
+<code>19.90</code>
+
+<i>Pour conserver le prix actuel :</i>
+<code>-</code>
+"""
+    )
+
+
+# ============================================================
+# MODIFICATION RAPIDE DU STOCK
+# ============================================================
+
+@router.callback_query(
+    lambda callback: callback.data.startswith("admin_product_stock:")
+)
+async def admin_product_stock_callback(
+    callback: CallbackQuery,
+    state: FSMContext,
+):
+    if not is_admin(callback.from_user.id):
+        await callback.answer(
+            "⛔ Accès refusé.",
+            show_alert=True,
+        )
+        return
+
+    product_id = int(callback.data.split(":")[1])
+
+    async with AsyncSessionLocal() as session:
+        product = await session.scalar(
+            select(Product).where(Product.id == product_id)
+        )
+
+    if product is None:
+        await callback.answer(
+            "Produit introuvable.",
+            show_alert=True,
+        )
+        return
+
+    await state.clear()
+    await state.update_data(product_id=product.id)
+    await state.set_state(ProductStates.editing_stock)
+
+    await callback.answer()
+
+    await callback.message.edit_text(
+        f"""
+📊 <b>MODIFIER LE STOCK</b>
+
+Produit :
+<b>{product.name}</b>
+
+Stock actuel :
+<b>{product.stock}</b>
+
+Entrez le nouveau stock :
+
+Exemple :
+<code>50</code>
+
+<i>Pour conserver le stock actuel :</i>
+<code>-</code>
+"""
+    )
+
+
+# ============================================================
+# ACTIVER / DESACTIVER UN PRODUIT
+# ============================================================
+
+@router.callback_query(
+    lambda callback: callback.data.startswith("admin_product_toggle:")
+)
+async def admin_product_toggle_callback(
+    callback: CallbackQuery,
+):
+    if not is_admin(callback.from_user.id):
+        await callback.answer(
+            "⛔ Accès refusé.",
+            show_alert=True,
+        )
+        return
+
+    product_id = int(callback.data.split(":")[1])
+
+    async with AsyncSessionLocal() as session:
+        product = await session.scalar(
+            select(Product).where(Product.id == product_id)
+        )
+
+        if product is None:
+            await callback.answer(
+                "Produit introuvable.",
+                show_alert=True,
+            )
+            return
+
+        product.is_active = not product.is_active
+
+        await session.commit()
+        await session.refresh(product)
+
+        category = await session.scalar(
+            select(Category).where(
+                Category.id == product.category_id
+            )
+        )
+
+    status = "🟢 ACTIF" if product.is_active else "🔴 INACTIF"
+
+    await callback.answer(
+        "✅ Produit activé." if product.is_active
+        else "🔴 Produit désactivé."
+    )
+
+    await callback.message.edit_text(
+        f"""
+📦 <b>PRODUIT #{product.id}</b>
+
+<b>{product.name}</b>
+
+📝 Description :
+{product.description or "Aucune description"}
+
+💰 Prix : <b>{product.price:.2f} €</b>
+📊 Stock : <b>{product.stock}</b>
+📂 Catégorie : <b>{category.name if category else "Inconnue"}</b>
+📌 Statut : <b>{status}</b>
+""",
+        reply_markup=admin_product_detail_keyboard(product),
+    )
+
+
+# ============================================================
+# DETAIL CATEGORIE
+# ============================================================
+
+@router.callback_query(
+    lambda callback: callback.data.startswith("admin_category:")
+)
+async def admin_category_detail_callback(
+    callback: CallbackQuery,
+):
+    if not is_admin(callback.from_user.id):
+        await callback.answer(
+            "⛔ Accès refusé.",
+            show_alert=True,
+        )
+        return
+
+    category_id = int(callback.data.split(":")[1])
+
+    async with AsyncSessionLocal() as session:
+        category = await session.scalar(
+            select(Category).where(
+                Category.id == category_id
+            )
+        )
+
+    if category is None:
+        await callback.answer(
+            "Catégorie introuvable.",
+            show_alert=True,
+        )
+        return
+
+    status = "🟢 ACTIF" if category.is_active else "🔴 INACTIF"
+
+    await callback.answer()
+
+    await callback.message.edit_text(
+        f"""
+📂 <b>CATÉGORIE #{category.id}</b>
+
+<b>{category.name}</b>
+
+📝 Description :
+{category.description or "Aucune description"}
+
+🔢 Ordre : <b>{category.sort_order}</b>
+📌 Statut : <b>{status}</b>
+""",
+        reply_markup=admin_category_detail_keyboard(category),
+    )
+
+
+# ============================================================
+# ACTIVER / DESACTIVER CATEGORIE
+# ============================================================
+
+@router.callback_query(
+    lambda callback: callback.data.startswith("admin_category_toggle:")
+)
+async def admin_category_toggle_callback(
+    callback: CallbackQuery,
+):
+    if not is_admin(callback.from_user.id):
+        await callback.answer(
+            "⛔ Accès refusé.",
+            show_alert=True,
+        )
+        return
+
+    category_id = int(callback.data.split(":")[1])
+
+    async with AsyncSessionLocal() as session:
+        category = await session.scalar(
+            select(Category).where(
+                Category.id == category_id
+            )
+        )
+
+        if category is None:
+            await callback.answer(
+                "Catégorie introuvable.",
+                show_alert=True,
+            )
+            return
+
+        category.is_active = not category.is_active
+        await session.commit()
+        await session.refresh(category)
+
+    status = "activée" if category.is_active else "désactivée"
+
+    await callback.answer(
+        f"✅ Catégorie {status}."
+    )
+
+    status_label = (
+        "🟢 ACTIF"
+        if category.is_active
+        else "🔴 INACTIF"
+    )
+
+    await callback.message.edit_text(
+        f"""
+📂 <b>CATÉGORIE #{category.id}</b>
+
+<b>{category.name}</b>
+
+📝 Description :
+{category.description or "Aucune description"}
+
+🔢 Ordre : <b>{category.sort_order}</b>
+📌 Statut : <b>{status_label}</b>
+""",
+        reply_markup=admin_category_detail_keyboard(category),
+    )
+
+
+# ============================================================
+# MODIFICATION CATEGORIE
+# ============================================================
+
+@router.callback_query(
+    lambda callback: callback.data.startswith("admin_category_edit:")
+)
+async def admin_category_edit_callback(
+    callback: CallbackQuery,
+    state: FSMContext,
+):
+    if not is_admin(callback.from_user.id):
+        await callback.answer(
+            "⛔ Accès refusé.",
+            show_alert=True,
+        )
+        return
+
+    category_id = int(callback.data.split(":")[1])
+
+    async with AsyncSessionLocal() as session:
+        category = await session.scalar(
+            select(Category).where(
+                Category.id == category_id
+            )
+        )
+
+    if category is None:
+        await callback.answer(
+            "Catégorie introuvable.",
+            show_alert=True,
+        )
+        return
+
+    await state.clear()
+    await state.update_data(category_id=category.id)
+    await state.set_state(CategoryStates.editing_name)
+
+    await callback.answer()
+
+    await callback.message.edit_text(
+        f"""
+✏️ <b>MODIFICATION CATÉGORIE #{category.id}</b>
+
+Nom actuel :
+<b>{category.name}</b>
+
+Entrez le nouveau nom.
+
+<i>Pour conserver le nom actuel :</i>
+<code>-</code>
+"""
+    )
+
+
+@router.message(CategoryStates.editing_name)
+async def category_editing_name(
+    message: Message,
+    state: FSMContext,
+):
+    if not is_admin(message.from_user.id):
+        return
+
+    value = (message.text or "").strip()
+    data = await state.get_data()
+
+    async with AsyncSessionLocal() as session:
+        category = await session.scalar(
+            select(Category).where(
+                Category.id == data["category_id"]
+            )
+        )
+
+        if category is None:
+            await state.clear()
+            await message.answer("❌ Catégorie introuvable.")
+            return
+
+        if value != "-":
+            if not value:
+                await message.answer(
+                    "❌ Le nom ne peut pas être vide."
+                )
+                return
+
+            if len(value) > 255:
+                await message.answer(
+                    "❌ Nom trop long (255 caractères maximum)."
+                )
+                return
+
+            existing = await session.scalar(
+                select(Category).where(
+                    Category.name == value,
+                    Category.id != category.id,
+                )
+            )
+
+            if existing is not None:
+                await message.answer(
+                    "❌ Une catégorie portant ce nom existe déjà."
+                )
+                return
+
+            category.name = value
+
+        await session.commit()
+
+    await state.set_state(CategoryStates.editing_description)
+
+    await message.answer(
+        f"""
+📝 <b>DESCRIPTION</b>
+
+Description actuelle :
+{category.description or "Aucune description"}
+
+Entrez la nouvelle description.
+
+<i>Pour conserver la description actuelle :</i>
+<code>-</code>
+
+<i>Pour supprimer la description :</i>
+<code>vide</code>
+"""
+    )
+
+
+@router.message(CategoryStates.editing_description)
+async def category_editing_description(
+    message: Message,
+    state: FSMContext,
+):
+    if not is_admin(message.from_user.id):
+        return
+
+    value = (message.text or "").strip()
+    data = await state.get_data()
+
+    async with AsyncSessionLocal() as session:
+        category = await session.scalar(
+            select(Category).where(
+                Category.id == data["category_id"]
+            )
+        )
+
+        if category is None:
+            await state.clear()
+            await message.answer("❌ Catégorie introuvable.")
+            return
+
+        if value == "-":
+            pass
+        elif value.lower() == "vide":
+            category.description = None
+        else:
+            if len(value) > 1000:
+                await message.answer(
+                    "❌ Description trop longue (1000 caractères maximum)."
+                )
+                return
+
+            category.description = value
+
+        await session.commit()
+
+    await state.set_state(CategoryStates.editing_sort_order)
+
+    await message.answer(
+        f"""
+🔢 <b>ORDRE D'AFFICHAGE</b>
+
+Ordre actuel :
+<b>{category.sort_order}</b>
+
+Entrez le nouvel ordre.
+
+<i>Pour conserver l'ordre actuel :</i>
+<code>-</code>
+"""
+    )
+
+
+@router.message(CategoryStates.editing_sort_order)
+async def category_editing_sort_order(
+    message: Message,
+    state: FSMContext,
+):
+    if not is_admin(message.from_user.id):
+        return
+
+    value = (message.text or "").strip()
+    data = await state.get_data()
+
+    async with AsyncSessionLocal() as session:
+        category = await session.scalar(
+            select(Category).where(
+                Category.id == data["category_id"]
+            )
+        )
+
+        if category is None:
+            await state.clear()
+            await message.answer("❌ Catégorie introuvable.")
+            return
+
+        if value != "-":
+            try:
+                sort_order = int(value)
+            except ValueError:
+                await message.answer(
+                    "❌ Ordre invalide. Entrez un nombre entier."
+                )
+                return
+
+            if sort_order < 0:
+                await message.answer(
+                    "❌ L'ordre ne peut pas être négatif."
+                )
+                return
+
+            category.sort_order = sort_order
+
+        await session.commit()
+        await session.refresh(category)
+
+    await state.clear()
+
+    status = (
+        "🟢 ACTIF"
+        if category.is_active
+        else "🔴 INACTIF"
+    )
+
+    await message.answer(
+        f"""
+✅ <b>CATÉGORIE MODIFIÉE</b>
+
+📂 <b>{category.name}</b>
+
+📝 Description :
+{category.description or "Aucune description"}
+
+🔢 Ordre : <b>{category.sort_order}</b>
+📌 Statut : <b>{status}</b>
+
+🆔 ID : <b>#{category.id}</b>
+""",
+        reply_markup=admin_category_detail_keyboard(category),
+    )

@@ -1,0 +1,160 @@
+from aiogram import Router
+from aiogram.filters import Command
+from aiogram.types import CallbackQuery, Message
+from aiogram.filters import Command
+
+from bot.keyboards.main import main_menu_keyboard
+from bot.keyboards.common import back_to_menu_keyboard
+
+
+router = Router()
+
+
+@router.callback_query(lambda callback: callback.data == "back_to_menu")
+async def back_to_menu_handler(callback: CallbackQuery):
+    await callback.answer()
+
+    await callback.message.edit_text(
+        """
+🏠 <b>MENU PRINCIPAL</b>
+
+Bienvenue dans notre boutique ! 🛍️
+
+Que souhaitez-vous faire ?
+""",
+        reply_markup=main_menu_keyboard(),
+    )
+
+
+@router.callback_query(lambda callback: callback.data == "menu_shop")
+async def shop_menu_handler(callback: CallbackQuery):
+    await callback.answer()
+
+    await callback.message.edit_text(
+        """
+🛍️ <b>BOUTIQUE</b>
+
+La boutique sera bientôt disponible.
+
+Nous allons prochainement ajouter :
+• 📂 Catégories
+• 📦 Produits
+• 💰 Prix
+• 📊 Stock
+• 🧺 Ajout au panier
+""",
+        reply_markup=back_to_menu_keyboard(),
+    )
+
+
+@router.callback_query(lambda callback: callback.data == "menu_cart")
+async def cart_menu_handler(callback: CallbackQuery):
+    await callback.answer()
+
+    await callback.message.edit_text(
+        """
+🧺 <b>MON PANIER</b>
+
+Votre panier est actuellement vide.
+""",
+        reply_markup=back_to_menu_keyboard(),
+    )
+
+
+@router.callback_query(lambda callback: callback.data == "menu_orders")
+async def orders_menu_handler(callback: CallbackQuery):
+    await callback.answer()
+
+    await callback.message.edit_text(
+        """
+📦 <b>MES COMMANDES</b>
+
+Vous n'avez pas encore de commande.
+""",
+        reply_markup=back_to_menu_keyboard(),
+    )
+
+
+@router.callback_query(lambda callback: callback.data == "menu_history")
+async def history_menu_handler(callback: CallbackQuery):
+    await callback.answer()
+
+    await callback.message.edit_text(
+        """
+🕘 <b>HISTORIQUE</b>
+
+Votre historique de commandes apparaîtra ici.
+""",
+        reply_markup=back_to_menu_keyboard(),
+    )
+
+
+@router.callback_query(lambda callback: callback.data == "menu_account")
+async def account_menu_handler(callback: CallbackQuery):
+    await callback.answer()
+
+    user = callback.from_user
+
+    username = (
+        f"@{user.username}"
+        if user.username
+        else "Non renseigné"
+    )
+
+    await callback.message.edit_text(
+        f"""
+👤 <b>MON COMPTE</b>
+
+🆔 ID : <code>{user.id}</code>
+👤 Nom : {user.first_name or "Non renseigné"}
+🔗 Username : {username}
+""",
+        reply_markup=back_to_menu_keyboard(),
+    )
+
+
+@router.callback_query(lambda callback: callback.data == "menu_support")
+async def support_menu_handler(callback: CallbackQuery):
+    await callback.answer()
+
+    await callback.message.edit_text(
+        """
+💬 <b>SUPPORT</b>
+
+Pour toute question ou demande d'assistance,
+contactez notre équipe.
+
+Le système de support sera ajouté prochainement.
+""",
+        reply_markup=back_to_menu_keyboard(),
+    )
+
+
+@router.callback_query(lambda callback: callback.data == "menu_information")
+async def information_menu_handler(callback: CallbackQuery):
+    await callback.answer()
+
+    await callback.message.edit_text(
+        """
+ℹ️ <b>INFORMATIONS</b>
+
+🛍️ Boutique
+💵 Paiement en liquide sur place
+📦 Retrait directement en boutique
+
+Merci de votre confiance !
+""",
+        reply_markup=back_to_menu_keyboard(),
+    )
+
+
+@router.message(Command("boutique"))
+async def boutique_command_handler(message: Message):
+    await message.answer(
+        """
+🛍️ <b>BOUTIQUE</b>
+
+Utilisez le bouton ci-dessous pour accéder à la boutique.
+""",
+        reply_markup=main_menu_keyboard(),
+    )
