@@ -1,8 +1,5 @@
-.venv/
+*.tar.gz
+*.bundle
 __pycache__/
 *.pyc
-.env
-*.log
-logs/
-*.pre-admin-filter
-*.before-remove-admin-command-check
+.venv/
