@@ -3144,6 +3144,64 @@ def promotion_admin_keyboard(
         ]
     )
 
+@router.callback_query(
+    lambda callback: callback.data == "admin_users"
+)
+async def admin_users_callback(callback: CallbackQuery):
+    await callback.answer()
+
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(
+            select(User)
+            .order_by(User.created_at.desc())
+            .limit(20)
+        )
+
+        users = result.scalars().all()
+
+    lines = [
+        "👥 <b>UTILISATEURS</b>",
+        "",
+        f"Total affiché : {len(users)}",
+        "",
+    ]
+
+    if not users:
+        lines.append("Aucun utilisateur enregistré.")
+    else:
+        for user in users:
+            username = (
+                f"@{user.username}"
+                if user.username
+                else "Aucun pseudo"
+            )
+
+            lines.append(
+                f"• {user.first_name or 'Sans nom'} "
+                f"({username})"
+            )
+
+            lines.append(
+                f"ID : <code>{user.telegram_id}</code>"
+            )
+
+            lines.append("")
+
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="⬅ Retour",
+                    callback_data="admin_home",
+                )
+            ]
+        ]
+    )
+
+    await callback.message.answer(
+        "\n".join(lines),
+        reply_markup=keyboard,
+    )
 
 async def get_or_create_promotion():
     async with AsyncSessionLocal() as session:
