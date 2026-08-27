@@ -36,7 +36,3 @@ class InformationStates(StatesGroup):
 class PromotionStates(StatesGroup):
     waiting_title = State()
     waiting_content = State()
-
-
-class UserStates(StatesGroup):
-    waiting_telegram_id = State()

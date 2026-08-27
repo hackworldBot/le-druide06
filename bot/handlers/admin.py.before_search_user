@@ -29,7 +29,6 @@ from bot.states.admin import (
     CategoryStates,
     InformationStates,
     PromotionStates,
-    UserStates,
 )
 from bot.states.support import SupportStates
 
@@ -3570,85 +3569,4 @@ async def admin_users_stats_callback(callback: CallbackQuery):
         text,
         reply_markup=keyboard,
     )
-
-
-
-
-@router.callback_query(
-    lambda callback: callback.data == "admin_users_search"
-)
-async def admin_users_search_callback(
-    callback: CallbackQuery,
-    state: FSMContext,
-):
-    await callback.answer()
-
-    await state.set_state(
-        UserStates.waiting_telegram_id
-    )
-
-    await callback.message.answer(
-        "🔍 Envoyez l'ID Telegram de l'utilisateur :"
-    )
-
-
-@router.message(
-    UserStates.waiting_telegram_id
-)
-async def admin_user_search_process(
-    message: Message,
-    state: FSMContext,
-):
-    try:
-        telegram_id = int(message.text.strip())
-    except Exception:
-        await message.answer(
-            "❌ ID invalide."
-        )
-        return
-
-    async with AsyncSessionLocal() as session:
-        result = await session.execute(
-            select(User).where(
-                User.telegram_id == telegram_id
-            )
-        )
-
-        user = result.scalar_one_or_none()
-
-    await state.clear()
-
-    if not user:
-        await message.answer(
-            "❌ Utilisateur introuvable."
-        )
-        return
-
-    username = (
-        f"@{user.username}"
-        if user.username
-        else "Aucun pseudo"
-    )
-
-    status = (
-        "🚫 Bloqué"
-        if user.is_blocked
-        else "✅ Actif"
-    )
-
-    text = f"""
-👤 <b>UTILISATEUR</b>
-
-Nom : {user.first_name or "Inconnu"}
-Pseudo : {username}
-
-ID :
-<code>{user.telegram_id}</code>
-
-Statut : {status}
-Conditions :
-{"✅ Acceptées" if user.accepted else "❌ Refusées"}
-"""
-
-    await message.answer(text)
 
