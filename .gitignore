@@ -4,3 +4,5 @@ __pycache__/
 .env
 *.log
 logs/
+*.pre-admin-filter
+*.before-remove-admin-command-check
