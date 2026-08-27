@@ -101,16 +101,28 @@ async def show_cart(callback: CallbackQuery):
         items = await get_cart_items(session, cart.id)
 
     if not items:
-        await callback.message.edit_text(
-            """
+        try:
+            await callback.message.edit_text(
+                """
 🧺 MON PANIER
 
 Votre panier est actuellement vide.
 
 Rendez-vous dans 🛍️ Boutique pour ajouter des produits.
 """,
-            reply_markup=cart_keyboard([]),
-        )
+                reply_markup=cart_keyboard([]),
+            )
+        except Exception:
+            await callback.message.answer(
+                """
+🧺 MON PANIER
+
+Votre panier est actuellement vide.
+
+Rendez-vous dans 🛍️ Boutique pour ajouter des produits.
+""",
+                reply_markup=cart_keyboard([]),
+            )
         return
 
     total = calculate_total(items)
@@ -544,7 +556,14 @@ async def confirm_order_handler(callback: CallbackQuery):
 
         # Vérification complète du stock avant modification.
         for item in items:
-            if item["stock"] < item["quantity"]:
+
+            stock = (
+                item["variant_stock"]
+                if item.get("variant_id")
+                else item["stock"]
+            )
+
+            if stock < item["quantity"]:
                 await callback.answer(
                     f"Stock insuffisant pour {item['name']}.",
                     show_alert=True,
@@ -569,13 +588,21 @@ async def confirm_order_handler(callback: CallbackQuery):
                 quantity = item["quantity"]
                 product_id = item["product_id"]
 
+                price = (
+                    item["variant_price"]
+                    if item.get("variant_price") is not None
+                    else item["price"]
+                )
+
                 order_item = OrderItem(
                     order_id=order.id,
                     product_id=product_id,
                     product_name=item["name"],
+                    variant_id=item.get("variant_id"),
+                    variant_name=item.get("variant_name"),
                     quantity=quantity,
-                    unit_price=item["price"],
-                    subtotal=item["price"] * quantity,
+                    unit_price=price,
+                    subtotal=price * quantity,
                 )
 
                 session.add(order_item)
@@ -591,12 +618,36 @@ async def confirm_order_handler(callback: CallbackQuery):
                         f"Produit introuvable : {product_id}"
                     )
 
-                if product.stock < quantity:
-                    raise RuntimeError(
-                        f"Stock insuffisant : {product.name}"
+                if item.get("variant_id"):
+
+                    variant = await session.scalar(
+                        select(ProductVariant)
+                        .where(
+                            ProductVariant.id == item["variant_id"]
+                        )
+                        .with_for_update()
                     )
 
-                product.stock -= quantity
+                    if variant is None:
+                        raise RuntimeError(
+                            "Variante introuvable"
+                        )
+
+                    if variant.stock < quantity:
+                        raise RuntimeError(
+                            f"Stock insuffisant : {variant.name}"
+                        )
+
+                    variant.stock -= quantity
+
+                else:
+
+                    if product.stock < quantity:
+                        raise RuntimeError(
+                            f"Stock insuffisant : {product.name}"
+                        )
+
+                    product.stock -= quantity
 
             await session.execute(
                 delete(CartItem).where(
