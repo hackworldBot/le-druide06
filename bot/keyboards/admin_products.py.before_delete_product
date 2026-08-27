@@ -75,13 +75,6 @@ def admin_product_detail_keyboard(product):
 
     buttons.append([
         InlineKeyboardButton(
-            text="🗑️ Supprimer",
-            callback_data=f"admin_product_delete:{product.id}",
-        )
-    ])
-
-    buttons.append([
-        InlineKeyboardButton(
             text="💰 Modifier le prix",
             callback_data=f"admin_product_price:{product.id}",
         ),
