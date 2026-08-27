@@ -9,6 +9,7 @@ from aiogram.types import (
 )
 from aiogram.fsm.context import FSMContext
 from sqlalchemy import select
+from bot.filters.admin import AdminFilter
 
 from database.database import AsyncSessionLocal
 from database.models import (
@@ -48,11 +49,11 @@ from bot.keyboards.admin import (
 
 router = Router()
 
-ADMIN_TELEGRAM_ID = 8727592009
+router.message.filter(AdminFilter())
+router.callback_query.filter(AdminFilter())
 
 
-def is_admin(telegram_id: int) -> bool:
-    return telegram_id == ADMIN_TELEGRAM_ID
+
 
 
 async def get_orders():
@@ -140,14 +141,8 @@ Sélectionne une commande :
         )
 
 
-@router.message(Command("admin"))
+@router.message(AdminFilter(), Command("admin"))
 async def admin_command(message: Message):
-    if not is_admin(message.from_user.id):
-        await message.answer(
-            "⛔ Accès administrateur refusé."
-        )
-        return
-
     await show_admin_home(message)
 
 
@@ -175,16 +170,10 @@ Choisissez une section :
 
 
 @router.callback_query(
+    AdminFilter(),
     lambda callback: callback.data == "admin_home"
 )
 async def admin_home_callback(callback: CallbackQuery):
-    if not is_admin(callback.from_user.id):
-        await callback.answer(
-            "⛔ Accès refusé.",
-            show_alert=True,
-        )
-        return
-
     await callback.answer()
     await show_admin_home(callback)
 
@@ -219,34 +208,22 @@ Choisissez une action :
 
 
 @router.callback_query(
+    AdminFilter(),
     lambda callback: callback.data == "admin_products"
 )
 async def admin_products_callback(callback: CallbackQuery):
-    if not is_admin(callback.from_user.id):
-        await callback.answer(
-            "⛔ Accès refusé.",
-            show_alert=True,
-        )
-        return
-
     await callback.answer()
     await show_admin_products(callback)
 
 
 @router.callback_query(
+    AdminFilter(),
     lambda callback: callback.data == "admin_product_add"
 )
 async def admin_product_add_callback(
     callback: CallbackQuery,
     state: FSMContext,
 ):
-    if not is_admin(callback.from_user.id):
-        await callback.answer(
-            "⛔ Accès refusé.",
-            show_alert=True,
-        )
-        return
-
     await state.clear()
     await state.set_state(ProductStates.waiting_name)
 
@@ -265,12 +242,6 @@ Entrez le nom du produit :
     lambda callback: callback.data == "admin_product_list"
 )
 async def admin_product_list_callback(callback: CallbackQuery):
-    if not is_admin(callback.from_user.id):
-        await callback.answer(
-            "⛔ Accès refusé.",
-            show_alert=True,
-        )
-        return
 
     async with AsyncSessionLocal() as session:
         result = await session.execute(
@@ -305,12 +276,6 @@ Sélectionnez un produit :
     lambda callback: callback.data.startswith("admin_product:")
 )
 async def admin_product_detail_callback(callback: CallbackQuery):
-    if not is_admin(callback.from_user.id):
-        await callback.answer(
-            "⛔ Accès refusé.",
-            show_alert=True,
-        )
-        return
 
     product_id = int(callback.data.split(":")[1])
 
@@ -370,12 +335,6 @@ async def admin_product_detail_callback(callback: CallbackQuery):
 async def admin_categories_callback(
     callback: CallbackQuery,
 ):
-    if not is_admin(callback.from_user.id):
-        await callback.answer(
-            "⛔ Accès refusé.",
-            show_alert=True,
-        )
-        return
 
     async with AsyncSessionLocal() as session:
         result = await session.execute(
@@ -414,12 +373,6 @@ async def admin_category_add_callback(
     callback: CallbackQuery,
     state: FSMContext,
 ):
-    if not is_admin(callback.from_user.id):
-        await callback.answer(
-            "⛔ Accès refusé.",
-            show_alert=True,
-        )
-        return
 
     await state.clear()
     await state.set_state(CategoryStates.waiting_name)
@@ -443,8 +396,6 @@ async def category_waiting_name(
     message: Message,
     state: FSMContext,
 ):
-    if not is_admin(message.from_user.id):
-        return
 
     value = (message.text or "").strip()
 
@@ -493,8 +444,6 @@ async def category_waiting_description(
     message: Message,
     state: FSMContext,
 ):
-    if not is_admin(message.from_user.id):
-        return
 
     value = (message.text or "").strip()
 
@@ -528,8 +477,6 @@ async def category_waiting_sort_order(
     message: Message,
     state: FSMContext,
 ):
-    if not is_admin(message.from_user.id):
-        return
 
     value = (message.text or "").strip()
 
@@ -614,12 +561,6 @@ async def category_waiting_sort_order(
     lambda callback: callback.data == "admin_orders"
 )
 async def admin_orders_callback(callback: CallbackQuery):
-    if not is_admin(callback.from_user.id):
-        await callback.answer(
-            "⛔ Accès refusé.",
-            show_alert=True,
-        )
-        return
 
     await callback.answer()
     await show_admin_orders(callback)
@@ -629,12 +570,6 @@ async def admin_orders_callback(callback: CallbackQuery):
     lambda callback: callback.data.startswith("admin_order:")
 )
 async def admin_order_detail(callback: CallbackQuery):
-    if not is_admin(callback.from_user.id):
-        await callback.answer(
-            "⛔ Accès refusé.",
-            show_alert=True,
-        )
-        return
 
     order_id = int(callback.data.split(":")[1])
 
@@ -691,12 +626,6 @@ async def admin_order_detail(callback: CallbackQuery):
     lambda callback: callback.data.startswith("admin_status:")
 )
 async def admin_change_status(callback: CallbackQuery):
-    if not is_admin(callback.from_user.id):
-        await callback.answer(
-            "⛔ Accès refusé.",
-            show_alert=True,
-        )
-        return
 
     parts = callback.data.split(":")
 
@@ -812,8 +741,6 @@ async def product_waiting_name(
     message: Message,
     state: FSMContext,
 ):
-    if not is_admin(message.from_user.id):
-        return
 
     name = message.text.strip()
 
@@ -847,8 +774,6 @@ async def product_waiting_description(
     message: Message,
     state: FSMContext,
 ):
-    if not is_admin(message.from_user.id):
-        return
 
     description = message.text.strip()
 
@@ -877,8 +802,6 @@ async def product_waiting_price(
     message: Message,
     state: FSMContext,
 ):
-    if not is_admin(message.from_user.id):
-        return
 
     from decimal import Decimal, InvalidOperation
 
@@ -921,8 +844,6 @@ async def product_waiting_stock(
     message: Message,
     state: FSMContext,
 ):
-    if not is_admin(message.from_user.id):
-        return
 
     value = message.text.strip()
 
@@ -979,12 +900,6 @@ async def product_select_category(
     callback: CallbackQuery,
     state: FSMContext,
 ):
-    if not is_admin(callback.from_user.id):
-        await callback.answer(
-            "⛔ Accès refusé.",
-            show_alert=True,
-        )
-        return
 
     if await state.get_state() != ProductStates.waiting_category.state:
         await callback.answer(
@@ -1061,12 +976,6 @@ async def admin_product_edit_callback(
     callback: CallbackQuery,
     state: FSMContext,
 ):
-    if not is_admin(callback.from_user.id):
-        await callback.answer(
-            "⛔ Accès refusé.",
-            show_alert=True,
-        )
-        return
 
     product_id = int(callback.data.split(":")[1])
 
@@ -1108,8 +1017,6 @@ async def product_editing_name(
     message: Message,
     state: FSMContext,
 ):
-    if not is_admin(message.from_user.id):
-        return
 
     value = message.text.strip()
     data = await state.get_data()
@@ -1168,8 +1075,6 @@ async def product_editing_description(
     message: Message,
     state: FSMContext,
 ):
-    if not is_admin(message.from_user.id):
-        return
 
     value = message.text.strip()
     data = await state.get_data()
@@ -1226,8 +1131,6 @@ async def product_editing_price(
     message: Message,
     state: FSMContext,
 ):
-    if not is_admin(message.from_user.id):
-        return
 
     from decimal import Decimal, InvalidOperation
 
@@ -1302,8 +1205,6 @@ async def product_editing_stock(
     message: Message,
     state: FSMContext,
 ):
-    if not is_admin(message.from_user.id):
-        return
 
     value = message.text.strip()
     data = await state.get_data()
@@ -1390,12 +1291,6 @@ async def admin_product_price_callback(
     callback: CallbackQuery,
     state: FSMContext,
 ):
-    if not is_admin(callback.from_user.id):
-        await callback.answer(
-            "⛔ Accès refusé.",
-            show_alert=True,
-        )
-        return
 
     product_id = int(callback.data.split(":")[1])
 
@@ -1449,12 +1344,6 @@ async def admin_product_stock_callback(
     callback: CallbackQuery,
     state: FSMContext,
 ):
-    if not is_admin(callback.from_user.id):
-        await callback.answer(
-            "⛔ Accès refusé.",
-            show_alert=True,
-        )
-        return
 
     product_id = int(callback.data.split(":")[1])
 
@@ -1507,12 +1396,6 @@ Exemple :
 async def admin_product_toggle_callback(
     callback: CallbackQuery,
 ):
-    if not is_admin(callback.from_user.id):
-        await callback.answer(
-            "⛔ Accès refusé.",
-            show_alert=True,
-        )
-        return
 
     product_id = int(callback.data.split(":")[1])
 
@@ -1574,12 +1457,6 @@ async def admin_product_toggle_callback(
 async def admin_category_detail_callback(
     callback: CallbackQuery,
 ):
-    if not is_admin(callback.from_user.id):
-        await callback.answer(
-            "⛔ Accès refusé.",
-            show_alert=True,
-        )
-        return
 
     category_id = int(callback.data.split(":")[1])
 
@@ -1627,12 +1504,6 @@ async def admin_category_detail_callback(
 async def admin_category_toggle_callback(
     callback: CallbackQuery,
 ):
-    if not is_admin(callback.from_user.id):
-        await callback.answer(
-            "⛔ Accès refusé.",
-            show_alert=True,
-        )
-        return
 
     category_id = int(callback.data.split(":")[1])
 
@@ -1693,12 +1564,6 @@ async def admin_category_edit_callback(
     callback: CallbackQuery,
     state: FSMContext,
 ):
-    if not is_admin(callback.from_user.id):
-        await callback.answer(
-            "⛔ Accès refusé.",
-            show_alert=True,
-        )
-        return
 
     category_id = int(callback.data.split(":")[1])
 
@@ -1742,8 +1607,6 @@ async def category_editing_name(
     message: Message,
     state: FSMContext,
 ):
-    if not is_admin(message.from_user.id):
-        return
 
     value = (message.text or "").strip()
     data = await state.get_data()
@@ -1815,8 +1678,6 @@ async def category_editing_description(
     message: Message,
     state: FSMContext,
 ):
-    if not is_admin(message.from_user.id):
-        return
 
     value = (message.text or "").strip()
     data = await state.get_data()
@@ -1870,8 +1731,6 @@ async def category_editing_sort_order(
     message: Message,
     state: FSMContext,
 ):
-    if not is_admin(message.from_user.id):
-        return
 
     value = (message.text or "").strip()
     data = await state.get_data()
@@ -1944,12 +1803,6 @@ async def category_editing_sort_order(
 async def admin_category_delete_callback(
     callback: CallbackQuery,
 ):
-    if not is_admin(callback.from_user.id):
-        await callback.answer(
-            "⛔ Accès refusé.",
-            show_alert=True,
-        )
-        return
 
     category_id = int(callback.data.split(":")[1])
 
@@ -2042,12 +1895,6 @@ Cette action est définitive.
 async def admin_category_delete_confirm_callback(
     callback: CallbackQuery,
 ):
-    if not is_admin(callback.from_user.id):
-        await callback.answer(
-            "⛔ Accès refusé.",
-            show_alert=True,
-        )
-        return
 
     category_id = int(callback.data.split(":")[1])
 
@@ -2288,12 +2135,6 @@ Aucun ticket dans cette catégorie.
 async def admin_support_callback(
     callback: CallbackQuery,
 ):
-    if not is_admin(callback.from_user.id):
-        await callback.answer(
-            "⛔ Accès refusé.",
-            show_alert=True,
-        )
-        return
 
     await callback.answer()
     await show_admin_support(callback, "OPEN")
@@ -2308,12 +2149,6 @@ async def admin_support_callback(
 async def admin_support_filter_callback(
     callback: CallbackQuery,
 ):
-    if not is_admin(callback.from_user.id):
-        await callback.answer(
-            "⛔ Accès refusé.",
-            show_alert=True,
-        )
-        return
 
     status_filter = callback.data.split(":", 1)[1]
 
@@ -2343,12 +2178,6 @@ async def admin_support_filter_callback(
 async def admin_support_ticket_callback(
     callback: CallbackQuery,
 ):
-    if not is_admin(callback.from_user.id):
-        await callback.answer(
-            "⛔ Accès refusé.",
-            show_alert=True,
-        )
-        return
 
     ticket_id = int(
         callback.data.split(":")[1]
@@ -2436,12 +2265,6 @@ async def admin_support_ticket_callback(
 async def admin_support_status_callback(
     callback: CallbackQuery,
 ):
-    if not is_admin(callback.from_user.id):
-        await callback.answer(
-            "⛔ Accès refusé.",
-            show_alert=True,
-        )
-        return
 
     parts = callback.data.split(":")
 
@@ -2515,12 +2338,6 @@ async def admin_support_reply_callback(
     callback: CallbackQuery,
     state: FSMContext,
 ):
-    if not is_admin(callback.from_user.id):
-        await callback.answer(
-            "⛔ Accès refusé.",
-            show_alert=True,
-        )
-        return
 
     try:
         ticket_id = int(
@@ -2594,8 +2411,6 @@ async def admin_support_reply_message_handler(
     message: Message,
     state: FSMContext,
 ):
-    if not is_admin(message.from_user.id):
-        return
 
     if not message.text:
         await message.answer(
@@ -2746,8 +2561,6 @@ async def admin_support_cancel_command(
     message: Message,
     state: FSMContext,
 ):
-    if not is_admin(message.from_user.id):
-        return
 
     current_state = await state.get_state()
 
@@ -2934,12 +2747,6 @@ def information_admin_text(
 async def admin_information_callback(
     callback: CallbackQuery,
 ):
-    if not is_admin(callback.from_user.id):
-        await callback.answer(
-            "⛔ Accès refusé.",
-            show_alert=True,
-        )
-        return
 
     information = await get_or_create_information()
 
@@ -2970,12 +2777,6 @@ async def admin_information_edit_callback(
     callback: CallbackQuery,
     state: FSMContext,
 ):
-    if not is_admin(callback.from_user.id):
-        await callback.answer(
-            "⛔ Accès refusé.",
-            show_alert=True,
-        )
-        return
 
     parts = callback.data.split(":")
 
@@ -3062,8 +2863,6 @@ async def admin_information_field_message(
     message: Message,
     state: FSMContext,
 ):
-    if not is_admin(message.from_user.id):
-        return
 
     if not message.text:
         await message.answer(
@@ -3158,12 +2957,6 @@ La modification a bien été enregistrée.
 async def admin_information_toggle_callback(
     callback: CallbackQuery,
 ):
-    if not is_admin(callback.from_user.id):
-        await callback.answer(
-            "⛔ Accès refusé.",
-            show_alert=True,
-        )
-        return
 
     try:
         information_id = int(
@@ -3314,12 +3107,6 @@ async def get_or_create_promotion():
 async def admin_promotions_callback(
     callback: CallbackQuery,
 ):
-    if not is_admin(callback.from_user.id):
-        await callback.answer(
-            "⛔ Accès refusé.",
-            show_alert=True,
-        )
-        return
 
     promotion = await get_or_create_promotion()
 
@@ -3348,12 +3135,6 @@ async def admin_promotion_title_callback(
     callback: CallbackQuery,
     state: FSMContext,
 ):
-    if not is_admin(callback.from_user.id):
-        await callback.answer(
-            "⛔ Accès refusé.",
-            show_alert=True,
-        )
-        return
 
     promotion = await get_or_create_promotion()
 
@@ -3390,8 +3171,6 @@ async def admin_promotion_title_message(
     message: Message,
     state: FSMContext,
 ):
-    if not is_admin(message.from_user.id):
-        return
 
     value = (message.text or "").strip()
 
@@ -3452,12 +3231,6 @@ async def admin_promotion_content_callback(
     callback: CallbackQuery,
     state: FSMContext,
 ):
-    if not is_admin(callback.from_user.id):
-        await callback.answer(
-            "⛔ Accès refusé.",
-            show_alert=True,
-        )
-        return
 
     await get_or_create_promotion()
 
@@ -3493,8 +3266,6 @@ async def admin_promotion_content_message(
     message: Message,
     state: FSMContext,
 ):
-    if not is_admin(message.from_user.id):
-        return
 
     value = (message.text or "").strip()
 
@@ -3554,12 +3325,6 @@ async def admin_promotion_content_message(
 async def admin_promotion_toggle_callback(
     callback: CallbackQuery,
 ):
-    if not is_admin(callback.from_user.id):
-        await callback.answer(
-            "⛔ Accès refusé.",
-            show_alert=True,
-        )
-        return
 
     promotion = await get_or_create_promotion()
 
@@ -3612,8 +3377,6 @@ async def admin_promotion_cancel_command(
     message: Message,
     state: FSMContext,
 ):
-    if not is_admin(message.from_user.id):
-        return
 
     if (message.text or "").strip().lower() != "/cancel":
         return

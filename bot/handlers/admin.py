@@ -864,6 +864,69 @@ async def product_waiting_stock(
         return
 
     await state.update_data(stock=stock)
+    await state.set_state(ProductStates.waiting_product_type)
+
+    await message.answer(
+        "📦 <b>TYPE DE PRODUIT</b>\n\n"
+        "Tapez :\n\n"
+        "physical = produit physique\n"
+        "digital = produit numérique"
+    )
+    
+@router.message(ProductStates.waiting_product_type)
+async def product_waiting_product_type(
+    message: Message,
+    state: FSMContext,
+):
+    value = message.text.strip().lower()
+
+    if value not in ("physical", "digital"):
+        await message.answer(
+            "❌ Valeur invalide.\n\n"
+            "Répondez : physical ou digital"
+        )
+        return
+
+    await state.update_data(product_type=value)
+    await state.set_state(ProductStates.waiting_sku)
+
+    await message.answer(
+        "🏷️ SKU (optionnel)\n\n"
+        "Envoyez un SKU ou - pour ignorer."
+    )
+
+
+@router.message(ProductStates.waiting_sku)
+async def product_waiting_sku(
+    message: Message,
+    state: FSMContext,
+):
+    sku = message.text.strip()
+
+    if sku == "-":
+        sku = None
+
+    await state.update_data(sku=sku)
+    await state.set_state(ProductStates.waiting_download_link)
+
+    await message.answer(
+        "🔗 Lien de téléchargement\n\n"
+        "Pour un produit physique tapez -\n"
+        "Pour un produit numérique collez l'URL."
+    )
+
+
+@router.message(ProductStates.waiting_download_link)
+async def product_waiting_download_link(
+    message: Message,
+    state: FSMContext,
+):
+    link = message.text.strip()
+
+    if link == "-":
+        link = None
+
+    await state.update_data(download_link=link)
     await state.set_state(ProductStates.waiting_category)
 
     async with AsyncSessionLocal() as session:
@@ -931,10 +994,16 @@ async def product_select_category(
 
         product = Product(
             category_id=category.id,
+            sku=data.get("sku"),
+            product_type=data.get("product_type", "physical"),
             name=data["name"],
             description=data.get("description"),
             price=Decimal(data["price"]),
             stock=data["stock"],
+            sold_count=0,
+            download_link=data.get("download_link"),
+            created_by=callback.from_user.id,
+            updated_by=callback.from_user.id,
             is_active=True,
         )
 

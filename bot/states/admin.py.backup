@@ -6,11 +6,6 @@ class ProductStates(StatesGroup):
     waiting_description = State()
     waiting_price = State()
     waiting_stock = State()
-
-    waiting_product_type = State()
-    waiting_sku = State()
-    waiting_download_link = State()
-
     waiting_category = State()
 
     editing_name = State()
