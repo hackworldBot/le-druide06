@@ -90,7 +90,7 @@ Aucun produit disponible dans cette catégorie.
         )
         return
 
-    text = f"📂 {category.name}\n\n"
+    text = f"📂 <b>{category.name}</b>\n\n"
 
     if category.description:
         text += f"{category.description}\n\n"

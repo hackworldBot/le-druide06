@@ -101,7 +101,7 @@ Rendez-vous dans 🛍️ Boutique pour ajouter des produits.
     total = calculate_total(items)
 
     lines = [
-        "🧺 <b>MON PANIER</b>",
+        "🧺 MON PANIER ",
         "",
     ]
 
@@ -109,15 +109,15 @@ Rendez-vous dans 🛍️ Boutique pour ajouter des produits.
         subtotal = item["price"] * item["quantity"]
 
         lines.append(
-            f"📦 <b>{item['name']}</b>\n"
+            f"📦 {item['name']}\n"
             f"   {item['price']:.2f} € × {item['quantity']} = "
-            f"<b>{subtotal:.2f} €</b>"
+            f"   {subtotal:.2f} €"
         )
 
     lines.extend(
         [
             "",
-            f"💰 <b>Total : {total:.2f} €</b>",
+            f"💰 Total : {total:.2f} €",
             "",
             "💵 Paiement en liquide sur place.",
         ]
@@ -558,7 +558,7 @@ Rendez-vous dans 🛍️ Boutique pour ajouter des produits.
     total = calculate_total(items)
 
     lines = [
-        "🧺 <b>MON PANIER</b>",
+        "🧺 MON PANIER ",
         "",
     ]
 
@@ -566,15 +566,15 @@ Rendez-vous dans 🛍️ Boutique pour ajouter des produits.
         subtotal = item["price"] * item["quantity"]
 
         lines.append(
-            f"📦 <b>{item['name']}</b>\n"
+            f"📦 {item['name']}\n"
             f"   {item['price']:.2f} € × {item['quantity']} = "
-            f"<b>{subtotal:.2f} €</b>"
+            f"   {subtotal:.2f} €"
         )
 
     lines.extend(
         [
             "",
-            f"💰 <b>Total : {total:.2f} €</b>",
+            f"💰 Total : {total:.2f} €",
             "",
             "💵 Paiement en liquide sur place.",
         ]

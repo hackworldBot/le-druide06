@@ -65,7 +65,7 @@ async def account_menu_handler(callback: CallbackQuery):
 
         if user is None:
             error_text = (
-                "❌ <b>Compte introuvable</b>\n\n"
+                "❌ Compte introuvable \n\n"
                 "Veuillez utiliser /start puis accepter les conditions."
             )
 
@@ -479,7 +479,7 @@ async def information_menu_handler(
             await session.refresh(information)
 
     information_text = f"""
-ℹ️    <b>{information.title}</b>
+ℹ️    {information.title}
 
 {information.content}
 """
@@ -542,7 +542,7 @@ Revenez bientôt ! 😊
             content = "Aucune promotion disponible actuellement."
 
         promotions_text = f"""
-🏷️    <b>{promotion.title}</b>
+🏷️    {promotion.title}
 
 {content}
 """

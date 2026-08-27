@@ -596,14 +596,14 @@ async def admin_order_detail(callback: CallbackQuery):
         items = result.scalars().all()
 
     lines = [
-        f"👨‍💼 COMMANDE #{order.id}",
+        f"👨‍💼 <b>COMMANDE #{order.id}</b>",
         "",
         f"📅 {order.created_at:%d/%m/%Y %H:%M}",
-        f"📌 Statut : {status_label(order.status)}",
-        f"💰 Total : {order.total:.2f} €",
-        f"💵 Paiement : {order.payment_method}",
+        f"📌 Statut : <b>{status_label(order.status)}</b>",
+        f"💰 Total : <b>{order.total:.2f} €</b>",
+        f"💵 Paiement : <b>{order.payment_method}</b>",
         "",
-        "📦 ARTICLES",
+        "📦 <b>ARTICLES</b>",
         "",
     ]
 
@@ -611,7 +611,7 @@ async def admin_order_detail(callback: CallbackQuery):
         lines.append(
             f"• {item.product_name} "
             f"x{item.quantity} "
-            f"= {item.subtotal:.2f} €"
+            f"= <b>{item.subtotal:.2f} €</b>"
         )
 
     await callback.answer()
@@ -762,7 +762,7 @@ async def product_waiting_name(
     await state.set_state(ProductStates.waiting_description)
 
     await message.answer(
-        "📝 DESCRIPTION\n\n"
+        "📝 <b>DESCRIPTION</b>\n\n"
         "Entrez la description du produit.\n\n"
         "Si vous ne voulez pas de description, envoyez :\n"
         "<code>-</code>"
@@ -791,7 +791,7 @@ async def product_waiting_description(
     await state.set_state(ProductStates.waiting_price)
 
     await message.answer(
-        "💰 PRIX\n\n"
+        "💰 <b>PRIX</b>\n\n"
         "Entrez le prix en euros.\n\n"
         "Exemple : <code>12.50</code>"
     )
@@ -833,7 +833,7 @@ async def product_waiting_price(
     await state.set_state(ProductStates.waiting_stock)
 
     await message.answer(
-        "📊 STOCK\n\n"
+        "📊 <b>STOCK</b>\n\n"
         "Entrez la quantité disponible.\n\n"
         "Exemple : <code>10</code>"
     )
@@ -867,7 +867,7 @@ async def product_waiting_stock(
     await state.set_state(ProductStates.waiting_product_type)
 
     await message.answer(
-        "📦 TYPE DE PRODUIT \n\n"
+        "📦 <b>TYPE DE PRODUIT</b>\n\n"
         "Tapez :\n\n"
         "physical = produit physique\n"
         "digital = produit numérique"
@@ -950,7 +950,7 @@ async def product_waiting_download_link(
     from bot.keyboards.admin_products import product_categories_keyboard
 
     await message.answer(
-        "📂 CATÉGORIE\n\n"
+        "📂 <b>CATÉGORIE</b>\n\n"
         "Choisissez la catégorie du produit :",
         reply_markup=product_categories_keyboard(categories),
     )
@@ -2126,11 +2126,11 @@ async def show_admin_support(
         tickets = result.scalars().all()
 
     if status_filter == "OPEN":
-        title = "🟠 TICKETS OUVERTS"
+        title = "🟠 <b>TICKETS OUVERTS</b>"
     elif status_filter == "IN_PROGRESS":
-        title = "🔵 TICKETS EN COURS"
+        title = "🔵 <b>TICKETS EN COURS</b>"
     else:
-        title = "📋 TOUS LES TICKETS"
+        title = "📋 <b>TOUS LES TICKETS</b>"
 
     if not tickets:
         text = f"""
@@ -2142,7 +2142,7 @@ Aucun ticket dans cette catégorie.
 """
     else:
         lines = [
-            "💬 SUPPORT",
+            "💬 <b>SUPPORT</b>",
             "",
             title,
             "",
@@ -2159,7 +2159,7 @@ Aucun ticket dans cette catégorie.
                 icon = "📌"
 
             lines.append(
-                f"{icon} #{ticket.id} — "
+                f"{icon} <b>#{ticket.id}</b> — "
                 f"{ticket.topic}"
             )
 
@@ -2286,11 +2286,11 @@ async def admin_support_ticket_callback(
         status = ticket.status
 
     lines = [
-        "💬 TICKET SUPPORT",
+        "💬 <b>TICKET SUPPORT</b>",
         "",
-        f"🆔 Ticket : #{ticket.id}",
-        f"📌 Sujet : {ticket.topic}",
-        f"📊 Statut : {status}",
+        f"🆔 Ticket : <b>#{ticket.id}</b>",
+        f"📌 Sujet : <b>{ticket.topic}</b>",
+        f"📊 Statut : <b>{status}</b>",
         f"👤 User ID : <code>{ticket.user_id}</code>",
         "",
         "━━━━━━━━━━━━━━━━━━",
@@ -2307,7 +2307,7 @@ async def admin_support_ticket_callback(
                 sender = "👨‍💼 ADMIN"
 
             lines.append(
-                f"{sender}"
+                f"<b>{sender}</b>"
             )
             lines.append(item.message)
             lines.append("")

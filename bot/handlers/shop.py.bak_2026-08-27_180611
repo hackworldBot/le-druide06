@@ -28,7 +28,7 @@ async def shop_handler(callback: CallbackQuery):
         categories = result.scalars().all()
 
     if not categories:
-        await callback.message.answer(
+        await callback.message.edit_text(
             """
 🛍️ BOUTIQUE
 
@@ -43,7 +43,7 @@ Revenez plus tard.
         )
         return
 
-    await callback.message.answer(
+    await callback.message.edit_text(
         """
 🛍️ BOUTIQUE
 
@@ -63,7 +63,7 @@ async def category_handler(callback: CallbackQuery):
         category = await session.get(Category, category_id)
 
         if category is None or not category.is_active:
-            await callback.message.answer(
+            await callback.message.edit_text(
                 "❌ Cette catégorie n'existe plus.",
             )
             return
@@ -80,7 +80,7 @@ async def category_handler(callback: CallbackQuery):
         products = result.scalars().all()
 
     if not products:
-        await callback.message.answer(
+        await callback.message.edit_text(
             f"""
 📂 {category.name}
 
@@ -90,14 +90,14 @@ Aucun produit disponible dans cette catégorie.
         )
         return
 
-    text = f"📂 {category.name}\n\n"
+    text = f"📂 <b>{category.name}</b>\n\n"
 
     if category.description:
         text += f"{category.description}\n\n"
 
     text += "Choisissez un produit :"
 
-    await callback.message.answer(
+    await callback.message.edit_text(
         text,
         reply_markup=products_keyboard(products),
     )
@@ -113,7 +113,7 @@ async def product_handler(callback: CallbackQuery):
         product = await session.get(Product, product_id)
 
         if product is None or not product.is_active:
-            await callback.message.answer(
+            await callback.message.edit_text(
                 "❌ Ce produit n'est plus disponible."
             )
             return
@@ -159,7 +159,7 @@ async def product_handler(callback: CallbackQuery):
         except Exception:
             pass
 
-    await callback.message.answer(
+    await callback.message.edit_text(
         text,
         reply_markup=keyboard,
     )

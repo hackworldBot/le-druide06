@@ -81,7 +81,7 @@ Rendez-vous dans 🛍️ Boutique pour commencer vos achats.
         return
 
     lines = [
-        "📦 <b>MES COMMANDES</b>",
+        "📦 MES COMMANDES",
         "",
         "Voici vos commandes en cours :",
     ]
@@ -173,13 +173,13 @@ Votre historique de commandes est vide.
         return
 
     lines = [
-        "🕘 <b>HISTORIQUE DES COMMANDES</b>",
+        "🕘 HISTORIQUE DES COMMANDES ",
         "",
     ]
 
     for order in history_orders:
         lines.append(
-            f"📦 <b>Commande #{order.id}</b>\n"
+            f"📦 Commande #{order.id}\n"
             f"   📅 {order.created_at:%d/%m/%Y %H:%M}\n"
             f"   💰 {order.total:.2f} €\n"
             f"   {status_label(order.status)}"
@@ -249,24 +249,24 @@ async def order_detail_handler(callback: CallbackQuery):
         items = result.scalars().all()
 
     lines = [
-        f"📦 <b>COMMANDE #{order.id}</b>",
+        f"📦 COMMANDE #{order.id}",
         "",
         f"📅 {order.created_at:%d/%m/%Y %H:%M}",
-        f"📌 Statut : <b>{status_label(order.status)}</b>",
-        "💵 Paiement : <b>liquide sur place</b>",
+        f"📌 Statut : {status_label(order.status)}",
+        "💵 Paiement : liquide sur place",
         "",
     ]
 
     for item in items:
         lines.append(
-            f"• <b>{item.product_name}</b>\n"
+            f"• {item.product_name}\n"
             f"  {item.unit_price:.2f} € × {item.quantity} = "
-            f"<b>{item.subtotal:.2f} €</b>"
+            f"{item.subtotal:.2f} €"
         )
 
     lines.extend([
         "",
-        f"💰 <b>Total : {order.total:.2f} €</b>",
+        f"💰 Total : {order.total:.2f} €",
         "",
         "📍 Retrait directement en boutique.",
     ])
