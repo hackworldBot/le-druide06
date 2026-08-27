@@ -22,6 +22,7 @@ from database.models import (
     SupportMessage,
     Information,
     Promotion,
+    ProductVariant,
 )
 
 from bot.states.admin import (
@@ -37,6 +38,8 @@ from bot.keyboards.admin_products import (
     admin_products_keyboard,
     admin_product_list_keyboard,
     admin_product_detail_keyboard,
+    admin_variants_keyboard,
+    admin_variant_list_keyboard,
 )
 
 from bot.keyboards.admin import (
@@ -3810,3 +3813,129 @@ async def confirm_delete_product_callback(
         "✅ Produit supprimé avec succès."
     )
 
+
+@router.callback_query(
+    lambda callback: callback.data.startswith("admin_variants:")
+)
+async def admin_variants_callback(callback: CallbackQuery):
+
+    product_id = int(callback.data.split(":")[1])
+
+    async with AsyncSessionLocal() as session:
+        product = await session.scalar(
+            select(Product).where(
+                Product.id == product_id
+            )
+        )
+
+    if product is None:
+        await callback.answer(
+            "Produit introuvable.",
+            show_alert=True,
+        )
+        return
+
+    await callback.answer()
+
+    await callback.message.edit_text(
+        f"""
+🧩 GESTION DES VARIANTES
+
+Produit :
+{product.name}
+
+Choisissez une action :
+""",
+        reply_markup=admin_variants_keyboard(product.id),
+    )
+
+
+@router.callback_query(
+    lambda c: c.data.startswith("admin_variant_add:")
+)
+async def admin_variant_add_callback(
+    callback: CallbackQuery,
+    state: FSMContext,
+):
+    product_id = int(callback.data.split(":")[1])
+
+    await state.update_data(
+        variant_product_id=product_id
+    )
+
+    await state.set_state(
+        ProductStates.waiting_variant_name
+    )
+
+    await callback.message.answer(
+        "🧩 Nom de la variante ?"
+    )
+
+    await callback.answer()
+
+
+@router.message(
+    ProductStates.waiting_variant_name
+)
+async def variant_name_step(
+    message: Message,
+    state: FSMContext,
+):
+    await state.update_data(
+        variant_name=message.text
+    )
+
+    await state.set_state(
+        ProductStates.waiting_variant_price
+    )
+
+    await message.answer(
+        "💰 Prix de la variante ?"
+    )
+
+
+@router.message(
+    ProductStates.waiting_variant_price
+)
+async def variant_price_step(
+    message: Message,
+    state: FSMContext,
+):
+    await state.update_data(
+        variant_price=message.text
+    )
+
+    await state.set_state(
+        ProductStates.waiting_variant_stock
+    )
+
+    await message.answer(
+        "📦 Stock de la variante ?"
+    )
+
+
+@router.message(
+    ProductStates.waiting_variant_stock
+)
+async def variant_stock_step(
+    message: Message,
+    state: FSMContext,
+):
+    data = await state.get_data()
+
+    async with AsyncSessionLocal() as session:
+        variant = ProductVariant(
+            product_id=data["variant_product_id"],
+            name=data["variant_name"],
+            price=data["variant_price"],
+            stock=int(message.text),
+        )
+
+        session.add(variant)
+        await session.commit()
+
+    await state.clear()
+
+    await message.answer(
+        "✅ Variante ajoutée"
+    )

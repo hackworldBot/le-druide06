@@ -18,6 +18,10 @@ class ProductStates(StatesGroup):
     editing_price = State()
     editing_stock = State()
 
+    waiting_variant_name = State()
+    waiting_variant_price = State()
+    waiting_variant_stock = State()
+
 
 class CategoryStates(StatesGroup):
     waiting_name = State()

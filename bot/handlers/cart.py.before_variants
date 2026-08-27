@@ -7,7 +7,7 @@ from sqlalchemy import delete, select
 
 from bot.keyboards.cart import cart_keyboard, checkout_keyboard
 from database.database import AsyncSessionLocal
-from database.models import Cart, CartItem, Order, OrderItem, Product, ProductVariant, User
+from database.models import Cart, CartItem, Order, OrderItem, Product, User
 
 
 router = Router()
@@ -46,20 +46,12 @@ async def get_cart_items(session, cart_id: int):
         select(
             CartItem.id,
             CartItem.quantity,
-            CartItem.variant_id,
             Product.id.label("product_id"),
             Product.name,
             Product.price,
             Product.stock,
-            ProductVariant.name.label("variant_name"),
-            ProductVariant.price.label("variant_price"),
-            ProductVariant.stock.label("variant_stock"),
         )
         .join(Product, Product.id == CartItem.product_id)
-        .outerjoin(
-            ProductVariant,
-            ProductVariant.id == CartItem.variant_id,
-        )
         .where(CartItem.cart_id == cart_id)
         .order_by(CartItem.id)
     )
@@ -71,14 +63,7 @@ def calculate_total(items) -> Decimal:
     total = Decimal("0.00")
 
     for item in items:
-
-        price = (
-            item["variant_price"]
-            if item.get("variant_price") is not None
-            else item["price"]
-        )
-
-        total += price * item["quantity"]
+        total += item["price"] * item["quantity"]
 
     return total
 
@@ -121,24 +106,12 @@ Rendez-vous dans 🛍️ Boutique pour ajouter des produits.
     ]
 
     for item in items:
-
-        price = (
-            item["variant_price"]
-            if item.get("variant_price") is not None
-            else item["price"]
-        )
-
-        subtotal = price * item["quantity"]
-
-        label = f"📦 {item['name']}"
-
-        if item.get("variant_name"):
-            label += f"\n   └ {item['variant_name']}"
+        subtotal = item["price"] * item["quantity"]
 
         lines.append(
-            f"{label}\n"
-            f"   {price:.2f} € × {item['quantity']} = "
-            f"{subtotal:.2f} €"
+            f"📦 {item['name']}\n"
+            f"   {item['price']:.2f} € × {item['quantity']} = "
+            f"   {subtotal:.2f} €"
         )
 
     lines.extend(
@@ -150,16 +123,10 @@ Rendez-vous dans 🛍️ Boutique pour ajouter des produits.
         ]
     )
 
-    try:
-        await callback.message.edit_text(
-            "\n".join(lines),
-            reply_markup=cart_keyboard(items),
-        )
-    except Exception:
-        await callback.message.answer(
-            "\n".join(lines),
-            reply_markup=cart_keyboard(items),
-        )
+    await callback.message.edit_text(
+        "\n".join(lines),
+        reply_markup=cart_keyboard(items),
+    )
 
 
 @router.callback_query(lambda callback: callback.data == "menu_cart")
@@ -231,81 +198,6 @@ async def add_to_cart_handler(callback: CallbackQuery):
         await session.commit()
 
     await callback.answer("✅ Produit ajouté au panier")
-
-
-@router.callback_query(lambda callback: callback.data.startswith("add_variant:"))
-async def add_variant_handler(callback: CallbackQuery):
-    print("DEBUG ADD_VARIANT =", callback.data)
-
-    variant_id = int(callback.data.split(":")[1])
-    telegram_id = callback.from_user.id
-
-    async with AsyncSessionLocal() as session:
-
-        variant = await session.scalar(
-            select(ProductVariant).where(
-                ProductVariant.id == variant_id
-            )
-        )
-
-        if variant is None:
-            await callback.answer(
-                "Variante introuvable.",
-                show_alert=True,
-            )
-            return
-
-        if variant.stock <= 0:
-            await callback.answer(
-                "Cette variante est en rupture de stock.",
-                show_alert=True,
-            )
-            return
-
-        cart = await get_or_create_cart(
-            session,
-            telegram_id,
-        )
-
-        if cart is None:
-            await callback.answer(
-                "Veuillez utiliser /start.",
-                show_alert=True,
-            )
-            return
-
-        cart_item = await session.scalar(
-            select(CartItem).where(
-                CartItem.cart_id == cart.id,
-                CartItem.product_id == variant.product_id,
-                CartItem.variant_id == variant.id,
-            )
-        )
-
-        if cart_item is None:
-            cart_item = CartItem(
-                cart_id=cart.id,
-                product_id=variant.product_id,
-                variant_id=variant.id,
-                quantity=1,
-            )
-            session.add(cart_item)
-
-        else:
-            if cart_item.quantity >= variant.stock:
-                await callback.answer(
-                    "Stock maximum atteint.",
-                    show_alert=True,
-                )
-                return
-
-            cart_item.quantity += 1
-
-        await session.commit()
-
-    await callback.answer(
-        f"✅ {variant.name} ajouté au panier"
-    )
 
 
 @router.callback_query(lambda callback: callback.data.startswith("cart_delete:"))
@@ -671,24 +563,12 @@ Rendez-vous dans 🛍️ Boutique pour ajouter des produits.
     ]
 
     for item in items:
-
-        price = (
-            item["variant_price"]
-            if item.get("variant_price") is not None
-            else item["price"]
-        )
-
-        subtotal = price * item["quantity"]
-
-        label = f"📦 {item['name']}"
-
-        if item.get("variant_name"):
-            label += f"\n   └ {item['variant_name']}"
+        subtotal = item["price"] * item["quantity"]
 
         lines.append(
-            f"{label}\n"
-            f"   {price:.2f} € × {item['quantity']} = "
-            f"{subtotal:.2f} €"
+            f"📦 {item['name']}\n"
+            f"   {item['price']:.2f} € × {item['quantity']} = "
+            f"   {subtotal:.2f} €"
         )
 
     lines.extend(

@@ -47,46 +47,26 @@ def products_keyboard(products) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
-def product_keyboard(
-    product_id: int,
-    category_id: int,
-    variants=None,
-) -> InlineKeyboardMarkup:
-
-    buttons = []
-
-    if variants:
-        for variant in variants:
-            icon = "❌" if variant.stock <= 0 else "🛒"
-
-            buttons.append([
-                InlineKeyboardButton(
-                    text=f"{icon} {variant.name} - {variant.price:.2f} €",
-                    callback_data=f"add_variant:{variant.id}",
-                )
-            ])
-    else:
-        buttons.append([
-            InlineKeyboardButton(
-                text="🧺 Ajouter au panier",
-                callback_data=f"add_cart:{product_id}",
-            )
-        ])
-
-    buttons.append([
-        InlineKeyboardButton(
-            text="⬅️ Produits",
-            callback_data=f"category:{category_id}",
-        )
-    ])
-
-    buttons.append([
-        InlineKeyboardButton(
-            text="🏠 Menu principal",
-            callback_data="back_to_menu",
-        )
-    ])
-
+def product_keyboard(product_id: int, category_id: int) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
-        inline_keyboard=buttons
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="🧺 Ajouter au panier",
+                    callback_data=f"add_cart:{product_id}",
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text="⬅️ Produits",
+                    callback_data=f"category:{category_id}",
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text="🏠 Menu principal",
+                    callback_data="back_to_menu",
+                )
+            ],
+        ]
     )

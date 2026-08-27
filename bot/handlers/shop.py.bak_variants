@@ -120,14 +120,6 @@ async def product_handler(callback: CallbackQuery):
 
         category_id = product.category_id
 
-        result = await session.execute(
-            select(ProductVariant)
-            .where(ProductVariant.product_id == product.id)
-            .order_by(ProductVariant.id)
-        )
-
-        variants = result.scalars().all()
-
     stock_text = (
         f"📊 Stock : {product.stock}"
         if product.stock > 0
@@ -147,7 +139,7 @@ async def product_handler(callback: CallbackQuery):
 {stock_text}
 """
 
-    keyboard = product_keyboard(product.id, category_id, variants)
+    keyboard = product_keyboard(product.id, category_id)
 
     if product.stock <= 0:
         keyboard.inline_keyboard[0][0].text = "❌ Rupture de stock"

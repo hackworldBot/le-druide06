@@ -46,20 +46,12 @@ async def get_cart_items(session, cart_id: int):
         select(
             CartItem.id,
             CartItem.quantity,
-            CartItem.variant_id,
             Product.id.label("product_id"),
             Product.name,
             Product.price,
             Product.stock,
-            ProductVariant.name.label("variant_name"),
-            ProductVariant.price.label("variant_price"),
-            ProductVariant.stock.label("variant_stock"),
         )
         .join(Product, Product.id == CartItem.product_id)
-        .outerjoin(
-            ProductVariant,
-            ProductVariant.id == CartItem.variant_id,
-        )
         .where(CartItem.cart_id == cart_id)
         .order_by(CartItem.id)
     )
@@ -71,14 +63,7 @@ def calculate_total(items) -> Decimal:
     total = Decimal("0.00")
 
     for item in items:
-
-        price = (
-            item["variant_price"]
-            if item.get("variant_price") is not None
-            else item["price"]
-        )
-
-        total += price * item["quantity"]
+        total += item["price"] * item["quantity"]
 
     return total
 
@@ -121,24 +106,12 @@ Rendez-vous dans 🛍️ Boutique pour ajouter des produits.
     ]
 
     for item in items:
-
-        price = (
-            item["variant_price"]
-            if item.get("variant_price") is not None
-            else item["price"]
-        )
-
-        subtotal = price * item["quantity"]
-
-        label = f"📦 {item['name']}"
-
-        if item.get("variant_name"):
-            label += f"\n   └ {item['variant_name']}"
+        subtotal = item["price"] * item["quantity"]
 
         lines.append(
-            f"{label}\n"
-            f"   {price:.2f} € × {item['quantity']} = "
-            f"{subtotal:.2f} €"
+            f"📦 {item['name']}\n"
+            f"   {item['price']:.2f} € × {item['quantity']} = "
+            f"   {subtotal:.2f} €"
         )
 
     lines.extend(
@@ -150,16 +123,10 @@ Rendez-vous dans 🛍️ Boutique pour ajouter des produits.
         ]
     )
 
-    try:
-        await callback.message.edit_text(
-            "\n".join(lines),
-            reply_markup=cart_keyboard(items),
-        )
-    except Exception:
-        await callback.message.answer(
-            "\n".join(lines),
-            reply_markup=cart_keyboard(items),
-        )
+    await callback.message.edit_text(
+        "\n".join(lines),
+        reply_markup=cart_keyboard(items),
+    )
 
 
 @router.callback_query(lambda callback: callback.data == "menu_cart")
@@ -671,24 +638,12 @@ Rendez-vous dans 🛍️ Boutique pour ajouter des produits.
     ]
 
     for item in items:
-
-        price = (
-            item["variant_price"]
-            if item.get("variant_price") is not None
-            else item["price"]
-        )
-
-        subtotal = price * item["quantity"]
-
-        label = f"📦 {item['name']}"
-
-        if item.get("variant_name"):
-            label += f"\n   └ {item['variant_name']}"
+        subtotal = item["price"] * item["quantity"]
 
         lines.append(
-            f"{label}\n"
-            f"   {price:.2f} € × {item['quantity']} = "
-            f"{subtotal:.2f} €"
+            f"📦 {item['name']}\n"
+            f"   {item['price']:.2f} € × {item['quantity']} = "
+            f"   {subtotal:.2f} €"
         )
 
     lines.extend(

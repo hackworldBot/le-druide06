@@ -91,13 +91,6 @@ def admin_product_detail_keyboard(product):
         ),
     ])
 
-    buttons.append([
-        InlineKeyboardButton(
-            text="🧩 Variantes",
-            callback_data=f"admin_variants:{product.id}",
-        )
-    ])
-
     if product.is_active:
         buttons.append([
             InlineKeyboardButton(
@@ -142,59 +135,6 @@ def product_categories_keyboard(categories) -> InlineKeyboardMarkup:
                 callback_data=f"admin_product_category:{category.id}",
             )
         ])
-
-    return InlineKeyboardMarkup(
-        inline_keyboard=buttons
-    )
-
-
-def admin_variants_keyboard(product_id):
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(
-                    text="➕ Ajouter une variante",
-                    callback_data=f"admin_variant_add:{product_id}",
-                )
-            ],
-            [
-                InlineKeyboardButton(
-                    text="📋 Liste des variantes",
-                    callback_data=f"admin_variant_list:{product_id}",
-                )
-            ],
-            [
-                InlineKeyboardButton(
-                    text="⬅️ Retour produit",
-                    callback_data=f"admin_product:{product_id}",
-                )
-            ],
-        ]
-    )
-
-
-def admin_variant_list_keyboard(variants, product_id):
-    buttons = []
-
-    for variant in variants:
-        buttons.append([
-            InlineKeyboardButton(
-                text=(
-                    f"#{variant.id} "
-                    f"{variant.name} "
-                    f"- {variant.price:.2f}€ "
-                    f"(stock {variant.stock})"
-                ),
-                callback_data=f"admin_variant_delete:{variant.id}",
-            )
-        ])
-
-    buttons.append([
-        InlineKeyboardButton(
-            text="⬅️ Variantes",
-            callback_data=f"admin_variants:{product_id}",
-        )
-    ])
 
     return InlineKeyboardMarkup(
         inline_keyboard=buttons
