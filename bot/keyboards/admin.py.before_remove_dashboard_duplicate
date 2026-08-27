@@ -54,6 +54,12 @@ def admin_main_keyboard() -> InlineKeyboardMarkup:
             ],
             [
                 InlineKeyboardButton(
+                    text="📊 Tableau de bord",
+                    callback_data="admin_dashboard",
+                )
+            ],
+            [
+                InlineKeyboardButton(
                     text="🔄 Actualiser",
                     callback_data="admin_home",
                 )

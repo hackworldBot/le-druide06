@@ -3652,3 +3652,90 @@ Conditions :
 
     await message.answer(text)
 
+
+@router.callback_query(
+    lambda callback: callback.data == "admin_dashboard"
+)
+async def admin_dashboard_callback(
+    callback: CallbackQuery,
+):
+    await callback.answer()
+
+    async with AsyncSessionLocal() as session:
+
+        users_count = len(
+            (
+                await session.execute(
+                    select(User)
+                )
+            ).scalars().all()
+        )
+
+        products_count = len(
+            (
+                await session.execute(
+                    select(Product)
+                )
+            ).scalars().all()
+        )
+
+        categories_count = len(
+            (
+                await session.execute(
+                    select(Category)
+                )
+            ).scalars().all()
+        )
+
+        orders_count = len(
+            (
+                await session.execute(
+                    select(Order)
+                )
+            ).scalars().all()
+        )
+
+        support_count = len(
+            (
+                await session.execute(
+                    select(SupportTicket)
+                )
+            ).scalars().all()
+        )
+
+    text = f"""
+📊 <b>TABLEAU DE BORD</b>
+
+👥 Utilisateurs : {users_count}
+
+📦 Produits : {products_count}
+
+📂 Catégories : {categories_count}
+
+🛒 Commandes : {orders_count}
+
+🎟 Tickets support : {support_count}
+"""
+
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="🔄 Actualiser",
+                    callback_data="admin_dashboard",
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text="⬅ Administration",
+                    callback_data="admin_home",
+                )
+            ]
+        ]
+    )
+
+    await callback.message.answer(
+        text,
+        reply_markup=keyboard,
+    )
+
