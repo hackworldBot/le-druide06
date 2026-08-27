@@ -8,6 +8,7 @@ from database.models.user import User
 from database.models.support import SupportTicket, SupportMessage
 from database.models.information import Information
 from database.models.promotion import Promotion
+from database.models.product_variant import ProductVariant
 
 __all__ = [
     "User",
@@ -21,4 +22,5 @@ __all__ = [
     "SupportMessage",
     "Information",
     "Promotion",
+    "ProductVariant",
 ]
