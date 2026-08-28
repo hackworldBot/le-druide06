@@ -3891,8 +3891,13 @@ async def confirm_delete_product_callback(
             )
             return
 
-        await session.delete(product)
-        await session.commit()
+        try:
+            await session.delete(product)
+            await session.commit()
+        except Exception as e:
+            await session.rollback()
+            print("ERREUR SUPPRESSION PRODUIT =", e)
+            raise
 
     await callback.answer(
         "✅ Produit supprimé"
