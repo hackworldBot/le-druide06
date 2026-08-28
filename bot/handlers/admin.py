@@ -4095,3 +4095,100 @@ async def admin_variant_delete_callback(
         ),
     )
 
+
+
+@router.callback_query(
+    lambda c: c.data.startswith("admin_product_move:")
+)
+async def admin_product_move_callback(
+    callback: CallbackQuery,
+):
+    product_id = int(callback.data.split(":")[1])
+
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(
+            select(Category)
+            .order_by(Category.name)
+        )
+
+        categories = result.scalars().all()
+
+    buttons = []
+
+    for category in categories:
+        buttons.append([
+            InlineKeyboardButton(
+                text=f"📂 {category.name}",
+                callback_data=f"admin_product_move_to:{product_id}:{category.id}",
+            )
+        ])
+
+    buttons.append([
+        InlineKeyboardButton(
+            text="⬅️ Retour",
+            callback_data=f"admin_product:{product_id}",
+        )
+    ])
+
+    await callback.answer()
+
+    await callback.message.edit_text(
+        "📂 Choisissez la nouvelle catégorie :",
+        reply_markup=InlineKeyboardMarkup(
+            inline_keyboard=buttons
+        ),
+    )
+
+
+@router.callback_query(
+    lambda c: c.data.startswith("admin_product_move_to:")
+)
+async def admin_product_move_to_callback(
+    callback: CallbackQuery,
+):
+    _, _, product_id, category_id = callback.data.split(":")
+
+    product_id = int(product_id)
+    category_id = int(category_id)
+
+    async with AsyncSessionLocal() as session:
+
+        product = await session.get(
+            Product,
+            product_id
+        )
+
+        category = await session.get(
+            Category,
+            category_id
+        )
+
+        if not product or not category:
+            await callback.answer(
+                "Erreur.",
+                show_alert=True,
+            )
+            return
+
+        product.category_id = category_id
+
+        await session.commit()
+
+        product_name = product.name
+        category_name = category.name
+
+    await callback.answer(
+        "✅ Produit déplacé"
+    )
+
+    await callback.message.edit_text(
+        f"""
+✅ Produit déplacé
+
+📦 {product_name}
+
+📂 Nouvelle catégorie :
+{category_name}
+"""
+    )
+
