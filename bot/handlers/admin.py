@@ -792,6 +792,58 @@ async def product_waiting_description(
         return
 
     await state.update_data(description=description)
+    await state.set_state(ProductStates.waiting_photo)
+
+    await message.answer(
+        "📷 PHOTO DU PRODUIT\n\n"
+        "Envoyez une photo du produit."
+    )
+
+
+
+
+@router.message(ProductStates.waiting_photo)
+async def product_waiting_photo(
+    message: Message,
+    state: FSMContext,
+):
+    if not message.photo:
+        await message.answer(
+            "❌ Envoyez une photo Telegram."
+        )
+        return
+
+    photo_id = message.photo[-1].file_id
+
+    await state.update_data(image=photo_id)
+    await state.set_state(ProductStates.waiting_video)
+
+    await message.answer(
+        "🎥 VIDÉO DU PRODUIT\n\n"
+        "Envoyez une vidéo ou tapez - pour ignorer."
+    )
+
+
+@router.message(ProductStates.waiting_video)
+async def product_waiting_video(
+    message: Message,
+    state: FSMContext,
+):
+    video_id = None
+
+    if message.text and message.text.strip() == "-":
+        pass
+
+    elif message.video:
+        video_id = message.video.file_id
+
+    else:
+        await message.answer(
+            "❌ Envoyez une vidéo ou tapez -"
+        )
+        return
+
+    await state.update_data(video=video_id)
     await state.set_state(ProductStates.waiting_price)
 
     await message.answer(
