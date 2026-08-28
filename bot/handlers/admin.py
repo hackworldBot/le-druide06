@@ -4146,7 +4146,7 @@ async def admin_product_move_callback(
 async def admin_product_move_to_callback(
     callback: CallbackQuery,
 ):
-    _, _, product_id, category_id = callback.data.split(":")
+    _, product_id, category_id = callback.data.split(":")
 
     product_id = int(product_id)
     category_id = int(category_id)
