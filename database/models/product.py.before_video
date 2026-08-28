@@ -62,11 +62,6 @@ class Product(Base):
         nullable=True,
     )
 
-    video: Mapped[str | None] = mapped_column(
-        String(1000),
-        nullable=True,
-    )
-
     download_link: Mapped[str | None] = mapped_column(
         Text,
         nullable=True,

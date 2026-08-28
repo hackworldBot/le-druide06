@@ -233,7 +233,7 @@ async def admin_product_add_callback(
 
     await callback.answer()
 
-    await callback.message.edit_text(
+    await callback.message.answer(
         """
 ➕    AJOUT D'UN PRODUIT
 
@@ -591,6 +591,12 @@ async def admin_order_detail(callback: CallbackQuery):
             )
             return
 
+        client = await session.scalar(
+            select(User).where(
+                User.id == order.user_id
+            )
+        )
+
         result = await session.execute(
             select(OrderItem)
             .where(OrderItem.order_id == order.id)
@@ -599,8 +605,37 @@ async def admin_order_detail(callback: CallbackQuery):
 
         items = result.scalars().all()
 
+    client_name = "Inconnu"
+
+    if client:
+        client_name = " ".join(
+            filter(
+                None,
+                [
+                    client.first_name,
+                    client.last_name,
+                ]
+            )
+        ) or "Inconnu"
+
+    username = (
+        f"@{client.username}"
+        if client and client.username
+        else "Non défini"
+    )
+
+    telegram_id = (
+        str(client.telegram_id)
+        if client
+        else "Inconnu"
+    )
+
     lines = [
         f"👨‍💼 COMMANDE #{order.id}",
+        "",
+        f"👤 Client : {client_name}",
+        f"🆔 Telegram ID : {telegram_id}",
+        f"📨 Username : {username}",
         "",
         f"📅 {order.created_at:%d/%m/%Y %H:%M}",
         f"📌 Statut : {status_label(order.status)}",
@@ -792,6 +827,58 @@ async def product_waiting_description(
         return
 
     await state.update_data(description=description)
+    await state.set_state(ProductStates.waiting_photo)
+
+    await message.answer(
+        "📷 PHOTO DU PRODUIT\n\n"
+        "Envoyez une photo du produit."
+    )
+
+
+
+
+@router.message(ProductStates.waiting_photo)
+async def product_waiting_photo(
+    message: Message,
+    state: FSMContext,
+):
+    if not message.photo:
+        await message.answer(
+            "❌ Envoyez une photo Telegram."
+        )
+        return
+
+    photo_id = message.photo[-1].file_id
+
+    await state.update_data(image=photo_id)
+    await state.set_state(ProductStates.waiting_video)
+
+    await message.answer(
+        "🎥 VIDÉO DU PRODUIT\n\n"
+        "Envoyez une vidéo ou tapez - pour ignorer."
+    )
+
+
+@router.message(ProductStates.waiting_video)
+async def product_waiting_video(
+    message: Message,
+    state: FSMContext,
+):
+    video_id = None
+
+    if message.text and message.text.strip() == "-":
+        pass
+
+    elif message.video:
+        video_id = message.video.file_id
+
+    else:
+        await message.answer(
+            "❌ Envoyez une vidéo ou tapez -"
+        )
+        return
+
+    await state.update_data(video=video_id)
     await state.set_state(ProductStates.waiting_price)
 
     await message.answer(
@@ -1005,6 +1092,8 @@ async def product_select_category(
             price=Decimal(data["price"]),
             stock=data["stock"],
             sold_count=0,
+            image=data.get("image"),
+            video=data.get("video"),
             download_link=data.get("download_link"),
             created_by=callback.from_user.id,
             updated_by=callback.from_user.id,
@@ -3819,6 +3908,9 @@ async def confirm_delete_product_callback(
 )
 async def admin_variants_callback(callback: CallbackQuery):
 
+    print("VARIANTS MENU OUVERT")
+    print("DATA =", callback.data)
+
     product_id = int(callback.data.split(":")[1])
 
     async with AsyncSessionLocal() as session:
@@ -3901,8 +3993,24 @@ async def variant_price_step(
     message: Message,
     state: FSMContext,
 ):
+    try:
+        price = (
+            message.text
+            .replace("€", "")
+            .replace(",", ".")
+            .strip()
+        )
+
+        price = float(price)
+
+    except ValueError:
+        await message.answer(
+            "❌ Prix invalide. Exemple : 5 ou 5.99"
+        )
+        return
+
     await state.update_data(
-        variant_price=message.text
+        variant_price=price
     )
 
     await state.set_state(
@@ -3939,3 +4047,183 @@ async def variant_stock_step(
     await message.answer(
         "✅ Variante ajoutée"
     )
+
+@router.callback_query(
+    lambda c: c.data.startswith("admin_variant_list:")
+)
+async def admin_variant_list_callback(
+    callback: CallbackQuery,
+):
+    print("LISTE VARIANTES APPELEE")
+    print("CALLBACK =", callback.data)
+
+    product_id = int(callback.data.split(":")[1])
+
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(
+            select(ProductVariant)
+            .where(ProductVariant.product_id == product_id)
+            .order_by(ProductVariant.id)
+        )
+
+        variants = result.scalars().all()
+
+    if not variants:
+        text = """
+📋 LISTE DES VARIANTES
+
+Aucune variante enregistrée.
+"""
+    else:
+        text = """
+📋 LISTE DES VARIANTES
+
+Cliquez sur une variante pour la supprimer :
+"""
+
+    await callback.answer()
+
+    await callback.message.edit_text(
+        text,
+        reply_markup=admin_variant_list_keyboard(
+            variants,
+            product_id,
+        ),
+    )
+
+
+@router.callback_query(
+    lambda c: c.data.startswith("admin_variant_delete:")
+)
+async def admin_variant_delete_callback(
+    callback: CallbackQuery,
+):
+    variant_id = int(callback.data.split(":")[1])
+
+    async with AsyncSessionLocal() as session:
+        variant = await session.get(
+            ProductVariant,
+            variant_id,
+        )
+
+        if variant is None:
+            await callback.answer(
+                "Variante introuvable.",
+                show_alert=True,
+            )
+            return
+
+        product_id = variant.product_id
+        name = variant.name
+
+        await session.delete(variant)
+        await session.commit()
+
+    await callback.answer(
+        "✅ Variante supprimée"
+    )
+
+    await callback.message.edit_text(
+        f"✅ Variante supprimée : {name}",
+        reply_markup=admin_variants_keyboard(
+            product_id
+        ),
+    )
+
+
+
+@router.callback_query(
+    lambda c: c.data.startswith("admin_product_move:")
+)
+async def admin_product_move_callback(
+    callback: CallbackQuery,
+):
+    product_id = int(callback.data.split(":")[1])
+
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(
+            select(Category)
+            .order_by(Category.name)
+        )
+
+        categories = result.scalars().all()
+
+    buttons = []
+
+    for category in categories:
+        buttons.append([
+            InlineKeyboardButton(
+                text=f"📂 {category.name}",
+                callback_data=f"admin_product_move_to:{product_id}:{category.id}",
+            )
+        ])
+
+    buttons.append([
+        InlineKeyboardButton(
+            text="⬅️ Retour",
+            callback_data=f"admin_product:{product_id}",
+        )
+    ])
+
+    await callback.answer()
+
+    await callback.message.edit_text(
+        "📂 Choisissez la nouvelle catégorie :",
+        reply_markup=InlineKeyboardMarkup(
+            inline_keyboard=buttons
+        ),
+    )
+
+
+@router.callback_query(
+    lambda c: c.data.startswith("admin_product_move_to:")
+)
+async def admin_product_move_to_callback(
+    callback: CallbackQuery,
+):
+    _, product_id, category_id = callback.data.split(":")
+
+    product_id = int(product_id)
+    category_id = int(category_id)
+
+    async with AsyncSessionLocal() as session:
+
+        product = await session.get(
+            Product,
+            product_id
+        )
+
+        category = await session.get(
+            Category,
+            category_id
+        )
+
+        if not product or not category:
+            await callback.answer(
+                "Erreur.",
+                show_alert=True,
+            )
+            return
+
+        product.category_id = category_id
+
+        await session.commit()
+
+        product_name = product.name
+        category_name = category.name
+
+    await callback.answer(
+        "✅ Produit déplacé"
+    )
+
+    await callback.message.edit_text(
+        f"""
+✅ Produit déplacé
+
+📦 {product_name}
+
+📂 Nouvelle catégorie :
+{category_name}
+"""
+    )
+

@@ -4,6 +4,10 @@ from aiogram.fsm.state import State, StatesGroup
 class ProductStates(StatesGroup):
     waiting_name = State()
     waiting_description = State()
+
+    waiting_photo = State()
+    waiting_video = State()
+
     waiting_price = State()
     waiting_stock = State()
 
@@ -21,7 +25,6 @@ class ProductStates(StatesGroup):
     waiting_variant_name = State()
     waiting_variant_price = State()
     waiting_variant_stock = State()
-
 
 class CategoryStates(StatesGroup):
     waiting_name = State()

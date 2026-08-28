@@ -98,6 +98,13 @@ def admin_product_detail_keyboard(product):
         )
     ])
 
+    buttons.append([
+        InlineKeyboardButton(
+            text="🔄 Changer catégorie",
+            callback_data=f"admin_product_move:{product.id}",
+        )
+    ])
+
     if product.is_active:
         buttons.append([
             InlineKeyboardButton(
