@@ -233,7 +233,7 @@ async def admin_product_add_callback(
 
     await callback.answer()
 
-    await callback.message.edit_text(
+    await callback.message.answer(
         """
 ➕    AJOUT D'UN PRODUIT
 
