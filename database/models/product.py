@@ -58,12 +58,11 @@ class Product(Base):
     )
 
     image: Mapped[str | None] = mapped_column(
-
-    video: Mapped[str | None] = mapped_column(
         String(1000),
         nullable=True,
     )
 
+    video: Mapped[str | None] = mapped_column(
         String(1000),
         nullable=True,
     )
