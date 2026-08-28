@@ -1057,6 +1057,8 @@ async def product_select_category(
             price=Decimal(data["price"]),
             stock=data["stock"],
             sold_count=0,
+            image=data.get("image"),
+            video=data.get("video"),
             download_link=data.get("download_link"),
             created_by=callback.from_user.id,
             updated_by=callback.from_user.id,
