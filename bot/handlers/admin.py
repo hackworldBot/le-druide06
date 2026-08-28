@@ -3958,8 +3958,24 @@ async def variant_price_step(
     message: Message,
     state: FSMContext,
 ):
+    try:
+        price = (
+            message.text
+            .replace("€", "")
+            .replace(",", ".")
+            .strip()
+        )
+
+        price = float(price)
+
+    except ValueError:
+        await message.answer(
+            "❌ Prix invalide. Exemple : 5 ou 5.99"
+        )
+        return
+
     await state.update_data(
-        variant_price=message.text
+        variant_price=price
     )
 
     await state.set_state(
