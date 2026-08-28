@@ -153,6 +153,22 @@ async def product_handler(callback: CallbackQuery):
         keyboard.inline_keyboard[0][0].text = "❌ Rupture de stock"
         keyboard.inline_keyboard[0][0].callback_data = "out_of_stock"
 
+    if product.video:
+        try:
+            await callback.message.delete()
+
+            await callback.message.answer_video(
+                video=product.video,
+                caption=text,
+                reply_markup=keyboard,
+            )
+            return
+
+        except Exception as e:
+            print("ERREUR VIDEO:", repr(e))
+            import traceback
+            traceback.print_exc()
+
     if product.image:
         try:
             await callback.message.delete()
@@ -164,8 +180,10 @@ async def product_handler(callback: CallbackQuery):
             )
             return
 
-        except Exception:
-            pass
+        except Exception as e:
+            print("ERREUR VIDEO:", repr(e))
+            import traceback
+            traceback.print_exc()
 
     await callback.message.answer(
         text,
