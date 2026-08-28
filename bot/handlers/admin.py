@@ -3993,3 +3993,44 @@ async def variant_stock_step(
     await message.answer(
         "✅ Variante ajoutée"
     )
+
+@router.callback_query(
+    lambda c: c.data.startswith("admin_variant_list:")
+)
+async def admin_variant_list_callback(
+    callback: CallbackQuery,
+):
+    product_id = int(callback.data.split(":")[1])
+
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(
+            select(ProductVariant)
+            .where(ProductVariant.product_id == product_id)
+            .order_by(ProductVariant.id)
+        )
+
+        variants = result.scalars().all()
+
+    if not variants:
+        text = """
+📋 LISTE DES VARIANTES
+
+Aucune variante enregistrée.
+"""
+    else:
+        text = """
+📋 LISTE DES VARIANTES
+
+Cliquez sur une variante pour la supprimer :
+"""
+
+    await callback.answer()
+
+    await callback.message.edit_text(
+        text,
+        reply_markup=admin_variant_list_keyboard(
+            variants,
+            product_id,
+        ),
+    )
+
