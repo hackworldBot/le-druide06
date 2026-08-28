@@ -3872,7 +3872,7 @@ async def confirm_delete_product_callback(
     lambda callback: callback.data.startswith("admin_variants:")
 )
 async def debug_variants_log(callback: CallbackQuery):
-    print("CALLBACK:", callback.data)
+    print("VARIANT CALLBACK =", callback.data)
 
 @router.callback_query(
     lambda callback: callback.data.startswith("admin_variants:")
