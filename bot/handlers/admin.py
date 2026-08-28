@@ -4006,6 +4006,9 @@ async def variant_stock_step(
 async def admin_variant_list_callback(
     callback: CallbackQuery,
 ):
+    print("LISTE VARIANTES APPELEE")
+    print("CALLBACK =", callback.data)
+
     product_id = int(callback.data.split(":")[1])
 
     async with AsyncSessionLocal() as session:
