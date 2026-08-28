@@ -3873,6 +3873,9 @@ async def confirm_delete_product_callback(
 )
 async def admin_variants_callback(callback: CallbackQuery):
 
+    print("VARIANTS MENU OUVERT")
+    print("DATA =", callback.data)
+
     product_id = int(callback.data.split(":")[1])
 
     async with AsyncSessionLocal() as session:
