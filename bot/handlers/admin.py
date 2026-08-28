@@ -4003,9 +4003,6 @@ async def variant_stock_step(
 @router.callback_query(
     lambda c: c.data.startswith("admin_variant_list:")
 )
-async def _debug_variant_list(callback: CallbackQuery):
-    print("LIST VARIANT CLICK =", callback.data)
-
 async def admin_variant_list_callback(
     callback: CallbackQuery,
 ):
