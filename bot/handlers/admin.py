@@ -3900,11 +3900,11 @@ async def confirm_delete_product_callback(
             raise
 
     await callback.answer(
-        "✅ Produit supprimé"
+        "✅ Produit désactivé"
     )
 
     await callback.message.edit_text(
-        "✅ Produit supprimé avec succès."
+        "✅ Produit désactivé car il existe dans l'historique des commandes."
     )
 
 
