@@ -4003,6 +4003,9 @@ async def variant_stock_step(
 @router.callback_query(
     lambda c: c.data.startswith("admin_variant_list:")
 )
+async def _debug_variant_list(callback: CallbackQuery):
+    print("LIST VARIANT CLICK =", callback.data)
+
 async def admin_variant_list_callback(
     callback: CallbackQuery,
 ):
@@ -4037,6 +4040,45 @@ Cliquez sur une variante pour la supprimer :
         reply_markup=admin_variant_list_keyboard(
             variants,
             product_id,
+        ),
+    )
+
+
+@router.callback_query(
+    lambda c: c.data.startswith("admin_variant_delete:")
+)
+async def admin_variant_delete_callback(
+    callback: CallbackQuery,
+):
+    variant_id = int(callback.data.split(":")[1])
+
+    async with AsyncSessionLocal() as session:
+        variant = await session.get(
+            ProductVariant,
+            variant_id,
+        )
+
+        if variant is None:
+            await callback.answer(
+                "Variante introuvable.",
+                show_alert=True,
+            )
+            return
+
+        product_id = variant.product_id
+        name = variant.name
+
+        await session.delete(variant)
+        await session.commit()
+
+    await callback.answer(
+        "✅ Variante supprimée"
+    )
+
+    await callback.message.edit_text(
+        f"✅ Variante supprimée : {name}",
+        reply_markup=admin_variants_keyboard(
+            product_id
         ),
     )
 
