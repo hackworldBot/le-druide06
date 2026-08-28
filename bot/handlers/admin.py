@@ -591,6 +591,12 @@ async def admin_order_detail(callback: CallbackQuery):
             )
             return
 
+        client = await session.scalar(
+            select(User).where(
+                User.id == order.user_id
+            )
+        )
+
         result = await session.execute(
             select(OrderItem)
             .where(OrderItem.order_id == order.id)
@@ -599,8 +605,37 @@ async def admin_order_detail(callback: CallbackQuery):
 
         items = result.scalars().all()
 
+    client_name = "Inconnu"
+
+    if client:
+        client_name = " ".join(
+            filter(
+                None,
+                [
+                    client.first_name,
+                    client.last_name,
+                ]
+            )
+        ) or "Inconnu"
+
+    username = (
+        f"@{client.username}"
+        if client and client.username
+        else "Non défini"
+    )
+
+    telegram_id = (
+        str(client.telegram_id)
+        if client
+        else "Inconnu"
+    )
+
     lines = [
         f"👨‍💼 COMMANDE #{order.id}",
+        "",
+        f"👤 Client : {client_name}",
+        f"🆔 Telegram ID : {telegram_id}",
+        f"📨 Username : {username}",
         "",
         f"📅 {order.created_at:%d/%m/%Y %H:%M}",
         f"📌 Statut : {status_label(order.status)}",
