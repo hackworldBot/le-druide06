@@ -755,7 +755,73 @@ async def admin_change_status(callback: CallbackQuery):
 
         order.status = new_status
 
+        user = await session.scalar(
+            select(User).where(
+                User.id == order.user_id
+            )
+        )
+
+        telegram_id = (
+            user.telegram_id
+            if user
+            else None
+        )
+
         await session.commit()
+
+    if new_status == "READY" and telegram_id:
+
+        try:
+            await callback.bot.send_message(
+                telegram_id,
+                f'''
+🎉 VOTRE COMMANDE EST PRÊTE
+
+📦 Commande #{order_id}
+
+Votre commande est désormais prête.
+
+📍 Adresse :
+
+LE DRUIDE 06
+(à modifier)
+
+🕒 Horaires :
+
+Lundi au Samedi
+09h00 - 18h00
+
+🙏 Merci pour votre achat.
+
+Toute l'équipe Le Druide 06 vous remercie pour votre confiance.
+
+🍀 À bientôt !
+'''
+            )
+        except Exception:
+            pass
+
+    if new_status == "COMPLETED" and telegram_id:
+
+        try:
+            await callback.bot.send_message(
+                telegram_id,
+                f'''
+✅ COMMANDE TERMINÉE
+
+📦 Commande #{order_id}
+
+Votre commande a été remise avec succès.
+
+🙏 Merci d'avoir acheté chez Le Druide 06.
+
+Nous espérons vous revoir très bientôt.
+
+🍀 Bonne journée !
+'''
+            )
+        except Exception:
+            pass
 
     if new_status == "CANCELLED":
         await callback.answer(
