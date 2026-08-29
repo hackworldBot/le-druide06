@@ -44,10 +44,16 @@ async def back_to_menu_handler(callback: CallbackQuery):
             reply_markup=main_menu_keyboard(),
         )
     else:
-        await callback.message.edit_text(
-            MAIN_MENU_TEXT,
-            reply_markup=main_menu_keyboard(),
-        )
+        try:
+            await callback.message.edit_text(
+                MAIN_MENU_TEXT,
+                reply_markup=main_menu_keyboard(),
+            )
+        except Exception:
+            await callback.message.answer(
+                MAIN_MENU_TEXT,
+                reply_markup=main_menu_keyboard(),
+            )
 
 
 @router.callback_query(lambda callback: callback.data == "menu_account")
